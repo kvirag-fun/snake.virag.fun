@@ -533,11 +533,6 @@
             rotten: 'You ate a rotten apple.',
         };
         let deathCause = null;
-        
-        function getDifficultyKey() {
-            const difficultySelect = document.getElementById('difficultySelect');
-            return `snakeTopScores_${difficultySelect.value}`;
-        }
 
         function updateDifficultyDisplay() {
             const difficultySelect = document.getElementById('difficultySelect');
@@ -563,29 +558,8 @@
             }
         }
 
-        // Leaderboard management - localStorage is the per-browser
-        // fallback (and what renders instantly, before the network round
-        // trip), Firestore is the shared global top 5 shown once it
-        // resolves. The game never breaks just because Firestore is slow
-        // or unreachable.
-        function getLocalLeaderboard() {
-            const key = getDifficultyKey();
-            const scores = localStorage.getItem(key);
-            return scores ? JSON.parse(scores) : [];
-        }
-
-        function updateLocalLeaderboard(newScore) {
-            const key = getDifficultyKey();
-            let scores = getLocalLeaderboard();
-            scores.push(newScore);
-            scores.sort((a, b) => b - a);
-            scores = scores.slice(0, 5);
-            localStorage.setItem(key, JSON.stringify(scores));
-        }
-
+        // Leaderboard management - global top 5, backed by Firestore.
         async function updateLeaderboard(newScore) {
-            updateLocalLeaderboard(newScore);
-
             try {
                 await submitGlobalScore(difficultySelect.value, newScore);
             } catch (e) {
@@ -608,16 +582,11 @@
         }
 
         async function displayLeaderboard() {
-            // Instant local render first, so the board is never blank/zeroed
-            // while the global query is in flight.
-            renderScores(getLocalLeaderboard());
-
             try {
                 const globalScores = await fetchGlobalTop5(difficultySelect.value);
                 renderScores(globalScores);
             } catch (e) {
-                // Offline or Firestore unreachable - the local scores
-                // already rendered above are the fallback.
+                console.warn('Could not load the global leaderboard:', e);
             }
         }
 

@@ -2,7 +2,8 @@
 
 A classic Snake game, built as a single self-contained `index.html`
 (markup, styles, and all the game logic in one file — no framework),
-built and deployed with Vite. Live at [virag.fun](https://www.virag.fun).
+built and deployed with Vite. Live at
+[snake.virag.fun](https://snake.virag.fun).
 
 ## Features
 
@@ -12,9 +13,7 @@ built and deployed with Vite. Live at [virag.fun](https://www.virag.fun).
   you lift it).
 - **Four difficulty levels** (Viper, Python, Anaconda, King Cobra), each
   with its own **global top-5 leaderboard** shared across everyone who
-  plays, backed by Firestore. A per-browser `localStorage` copy is kept
-  as an instant-render/offline fallback — the game never breaks just
-  because the network or Firestore is unreachable.
+  plays, backed by Firestore.
 - **Bad food**: occasional hazard tiles mixed in with regular food —
   hitting one ends the run just like hitting a wall or yourself.
 - **Sound effects** for eating food and game over (toggleable), plus a
@@ -41,8 +40,7 @@ bun run build
 Outputs to `dist/`. The Firebase config is baked in from the
 `VITE_FIREBASE_*` environment variables present at build time (see
 below) — set them locally to test a production build against the real
-project, or leave them unset to test the "Firestore unreachable"
-fallback path.
+project.
 
 ## Deployment
 
