@@ -29,6 +29,11 @@
             --markup: oklch(0.62 0.155 48);
             --markup-soft: oklch(0.62 0.155 48 / 0.12);
             --grid-line: oklch(0.448 0.105 256 / 0.07);
+            /* Same hue/chroma as --primary, just much darker - the game
+               canvas reads as the dark end of this site's own palette
+               rather than an unrelated neon-arcade blue (#0f3460, the
+               original theme's color). */
+            --canvas-background: oklch(0.22 0.05 258);
             --font-display: "Fraunces", "Georgia", serif;
             --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
             --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
@@ -166,7 +171,7 @@
         canvas {
             display: block;
             border-radius: 4px;
-            background: #0f3460;
+            background: var(--canvas-background);
         }
 
         .panel-title {
@@ -361,6 +366,11 @@
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
+        // Single source of truth with the CSS canvas { background: ... }
+        // rule - read from the :root custom property rather than a second
+        // hardcoded color duplicating it.
+        const CANVAS_BG = getComputedStyle(document.documentElement)
+            .getPropertyValue('--canvas-background').trim();
         const scoreElement = document.getElementById('score');
         const levelElement = document.getElementById('level');
         const gameOverElement = document.getElementById('gameOver');
@@ -555,7 +565,7 @@
         function drawGame() {
             // Clear canvas
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#0f3460';
+            ctx.fillStyle = CANVAS_BG;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
             // If game is not running, draw splash image and return
