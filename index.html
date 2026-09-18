@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>The Snake Game</title>
     <link rel="icon" type="image/x-icon" href="tab_icon.ico?v=1">
     <style>
@@ -42,6 +42,10 @@
             margin-top: 20px;
             text-align: center;
         }
+
+		.flex-container {
+  			touch-action: none;
+		}
 
         .difficulty-selector {
             margin: 10px 0 10px 0;
@@ -144,12 +148,12 @@
 
     <div class="controls">
         <div>Use ARROW KEYS or SWIPE to move</div>
-        <div id="gameOver" style="height: 30px; visibility: hidden; color:#ff0000; font-size:20px;">
+        <div id="gameOver" style="height: 30px; visibility: visible; color:#ff0000; font-size:20px;">
             Game Over! Double-tap or press R to restart.
         </div>
     </div>
 
-    <div class="version">v<span id="version">0.3.24</span></div>
+    <div class="version">v<span id="version">0.3.38</span></div>
     
     <script>
         const canvas = document.getElementById('gameCanvas');
@@ -167,7 +171,6 @@
                 displayLeaderboard();
             }
         });
-
         
         // Game settings
         const gridSize = 20;
@@ -185,7 +188,7 @@
         let dx = 0;
         let dy = 0;
         let score = 0;
-        let gameRunning = true;
+        let gameRunning = false;
         let gameSpeed = 150;
         let gameInterval;
 
@@ -194,11 +197,20 @@
         
         //Double tap settings
         let lastTap = 0;
-        const doubleTapDelay = 400;
+        const doubleTapDelay = 300;
 
         let needsRedraw = true;
         let lastUpdateTime = 0
 
+        //Handle splash screen image
+        const splashImage = new Image();
+        let splashLoaded = false;
+        
+        splashImage.onload = () => {
+            splashLoaded = true;
+        };
+        splashImage.src = 'snake_splash_screen.png';
+        
         function getDifficultyKey() {
             const difficultySelect = document.getElementById('difficultySelect');
             return `snakeTopScores_${difficultySelect.value}`;
@@ -342,6 +354,24 @@
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = '#0f3460';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // If game is not running, draw splash image and return
+            if (!gameRunning && splashLoaded) {
+                // Draw centered in the canvas; scale if needed
+                const iw = splashImage.width;
+                const ih = splashImage.height;
+                const cw = canvas.width;
+                const ch = canvas.height;
+        
+                const scale = Math.min(cw / iw, ch / ih); // fit inside canvas
+                const dw = iw * scale;
+                const dh = ih * scale;
+                const dx = (cw - dw) / 2;
+                const dy = (ch - dh) / 2;
+        
+                ctx.drawImage(splashImage, dx, dy, dw, dh);
+                return;
+            }
 
             // Draw food with stem
             ctx.fillStyle = '#ff0000';  // Red apple outline
@@ -530,6 +560,10 @@
             updateLevelDisplay(score);
             gameOverElement.style.visibility = 'hidden';
             gameRunning = true;
+
+            if (splashLoaded) {
+                splashLoaded = false
+            }
             
             // Toggle difficulty selector to ON
             toggleDifficultySelector();
@@ -572,7 +606,7 @@
         let touchDirectionSet = false;
         const minSwipeDistance = 20;
 
-        document.addEventListener('touchstart', (e) => {
+        canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
             touchStartX = e.touches[0].clientX;
             touchStartY = e.touches[0].clientY;
@@ -590,7 +624,7 @@
         // writing dx/dy directly, as this used to) so a swipe and a
         // still-pending keyboard turn resolve in the order they happened,
         // not by whichever line of code ran last.
-        document.addEventListener('touchmove', (e) => {
+        canvas.addEventListener('touchmove', (e) => {
             e.preventDefault();
             if (!gameRunning || touchDirectionSet) return;
 
@@ -607,7 +641,7 @@
             }
         }, { passive: false });
 
-        document.addEventListener('touchend', (e) => {
+        canvas.addEventListener('touchend', (e) => {
             e.preventDefault();
 
             // Double-tap to restart
@@ -642,14 +676,8 @@
         }
 
         // Initialize and start
-        randomFood();
-        randomBadFood()
         updateDifficultyDisplay();
         displayLeaderboard();
-        
-        // Toggle difficulty selector to ON
-        // toggleDifficultySelector();
-        
         requestAnimationFrame(gameLoop);
     </script>
 </body>
