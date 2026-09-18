@@ -371,6 +371,62 @@
         <div class="version">v<span id="version">0.3.38</span></div>
     </main>
 
+    <!-- Global (cross-device) leaderboard, backed by Firestore. Kept as
+         its own module script (ES module imports need type="module") and
+         bridged onto window - the main game script below stays a classic
+         script, so its functions/state stay reachable from devtools/tests
+         the way the rest of this file already relies on.
+
+         The Firebase config below isn't a secret - it only identifies
+         which project to talk to. firestore.rules (public read,
+         server-validated write, no update/delete ever) is the entire
+         access model, same principle as the other virag.fun apps, just
+         without Auth since this is a public game with no login. -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
+        import {
+            getFirestore, connectFirestoreEmulator, collection, addDoc,
+            serverTimestamp, query, where, orderBy, limit, getDocs,
+        } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: 'REPLACE_ME',
+            authDomain: 'REPLACE_ME.firebaseapp.com',
+            projectId: 'REPLACE_ME',
+            storageBucket: 'REPLACE_ME.firebasestorage.app',
+            messagingSenderId: 'REPLACE_ME',
+            appId: 'REPLACE_ME',
+        };
+
+        const firebaseApp = initializeApp(firebaseConfig);
+        const db = getFirestore(firebaseApp);
+
+        // Local dev only - talk to the emulator instead of the real
+        // project. See firestore.rules for the emulator setup.
+        if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+            connectFirestoreEmulator(db, '127.0.0.1', 8080);
+        }
+
+        window.fetchGlobalTop5 = async function fetchGlobalTop5(difficulty) {
+            const q = query(
+                collection(db, 'snakeScores'),
+                where('difficulty', '==', difficulty),
+                orderBy('score', 'desc'),
+                limit(5)
+            );
+            const snap = await getDocs(q);
+            return snap.docs.map((d) => d.data().score);
+        };
+
+        window.submitGlobalScore = async function submitGlobalScore(difficulty, score) {
+            await addDoc(collection(db, 'snakeScores'), {
+                difficulty,
+                score,
+                createdAt: serverTimestamp(),
+            });
+        };
+    </script>
+
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -494,45 +550,63 @@
             }
         }
 
-        // Leaderboard management
-        function getLeaderboard() {
+        // Leaderboard management - localStorage is the per-browser
+        // fallback (and what renders instantly, before the network round
+        // trip), Firestore is the shared global top 5 shown once it
+        // resolves. The game never breaks just because Firestore is slow
+        // or unreachable.
+        function getLocalLeaderboard() {
             const key = getDifficultyKey();
             const scores = localStorage.getItem(key);
             return scores ? JSON.parse(scores) : [];
         }
-        
-        function updateLeaderboard(newScore) {
+
+        function updateLocalLeaderboard(newScore) {
             const key = getDifficultyKey();
-            let scores = getLeaderboard();
-            
-            // Add new score
+            let scores = getLocalLeaderboard();
             scores.push(newScore);
-            
-            // Sort descending and keep top 5
             scores.sort((a, b) => b - a);
             scores = scores.slice(0, 5);
-            
-            // Save back to localStorage
             localStorage.setItem(key, JSON.stringify(scores));
-            
-            // Update display
+        }
+
+        async function updateLeaderboard(newScore) {
+            updateLocalLeaderboard(newScore);
+
+            try {
+                await submitGlobalScore(difficultySelect.value, newScore);
+            } catch (e) {
+                console.warn('Could not submit score to the global leaderboard:', e);
+            }
+
             displayLeaderboard();
         }
-        
-        function displayLeaderboard() {
-            const scores = getLeaderboard();
-            
-            // Always create exactly 5 scores (fill with 0s)
+
+        function renderScores(scores) {
             let displayScores = [...scores];
             while (displayScores.length < 5) {
                 displayScores.push(0);
             }
-            
+
             const topScoresElement = document.getElementById('topScoresList');
-            topScoresElement.innerHTML = displayScores.map((score, index) => 
+            topScoresElement.innerHTML = displayScores.map((score, index) =>
                 `${index + 1}. ${score}`
             ).join('<br>');
-        }        
+        }
+
+        async function displayLeaderboard() {
+            // Instant local render first, so the board is never blank/zeroed
+            // while the global query is in flight.
+            renderScores(getLocalLeaderboard());
+
+            try {
+                const globalScores = await fetchGlobalTop5(difficultySelect.value);
+                renderScores(globalScores);
+            } catch (e) {
+                // Offline or Firestore unreachable - the local scores
+                // already rendered above are the fallback.
+            }
+        }
 
         function updateLevelDisplay(score) {
             let level;

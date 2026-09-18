@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Global leaderboard entries. One document per submitted run - no
+    // login here (it's a public game, unlike the other virag.fun apps),
+    // so the rule itself is the entire anti-cheat check: reads are public,
+    // writes must look like a real run this game could actually produce.
+    match /snakeScores/{entry} {
+      allow read: if true;
+
+      allow create:
+        if request.resource.data.keys().hasOnly(['difficulty', 'score', 'createdAt'])
+        && request.resource.data.difficulty in ['0.00', '0.25', '0.50', '1.00']
+        && request.resource.data.score is int
+        && request.resource.data.score >= 0
+        // 20x20 board, +10 per food - max possible run is well under 4000.
+        && request.resource.data.score <= 5000
+        && request.resource.data.createdAt == request.time;
+
+      allow update, delete: if false;
+    }
+  }
+}
