@@ -1084,8 +1084,17 @@
 
         // Initialize and start
         updateDifficultyDisplay();
-        displayLeaderboard();
         requestAnimationFrame(gameLoop);
+
+        // The Firebase module script above is a deferred module - it
+        // hasn't necessarily run yet at this point, since classic scripts
+        // (this one) execute immediately during parsing, before
+        // deferred/module scripts do. DOMContentLoaded fires after all
+        // deferred scripts have run, so window.fetchGlobalTop5 is
+        // guaranteed to exist by then - calling displayLeaderboard()
+        // straight away here would silently miss the global fetch on
+        // every single page load, not just occasionally.
+        document.addEventListener('DOMContentLoaded', displayLeaderboard);
     </script>
 </body>
 </html>
