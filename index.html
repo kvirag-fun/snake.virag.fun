@@ -3,21 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>The Snake Game</title>
+    <title>Snake</title>
     <link rel="icon" type="image/x-icon" href="tab_icon.ico?v=1">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+        rel="stylesheet">
     <style>
+        /*
+         * Same "Blueprint / Engineer's drawing" design system used across
+         * virag.fun sites (see cv.virag.fun and ascii.virag.fun, both of
+         * which pull these exact tokens from a shared vendor/blueprint-
+         * framework git submodule) - copied inline here rather than
+         * pulled in as a submodule, since this repo is deliberately a
+         * single self-contained index.html with no build step.
+         */
+        :root {
+            --background: oklch(0.972 0.007 92);
+            --foreground: oklch(0.315 0.045 258);
+            --card: oklch(0.992 0.003 95);
+            --border: oklch(0.875 0.016 252);
+            --muted-foreground: oklch(0.52 0.03 255);
+            --primary: oklch(0.448 0.105 256);
+            --markup: oklch(0.62 0.155 48);
+            --markup-soft: oklch(0.62 0.155 48 / 0.12);
+            --grid-line: oklch(0.448 0.105 256 / 0.07);
+            --font-display: "Fraunces", "Georgia", serif;
+            --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+            --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+        }
+
         body {
             display: flex;
             flex-direction: column;
             align-items: center;
-            justify-content: center;
             min-height: 100vh;
             height: auto;
             margin: 0;
-            background: #1a1a2e;
-            font-family: Arial, sans-serif;
-            color: white;
-            
+            background-color: var(--background);
+            background-image:
+                linear-gradient(to right, var(--grid-line) 1px, transparent 1px),
+                linear-gradient(to bottom, var(--grid-line) 1px, transparent 1px);
+            background-size: 28px 28px;
+            font-family: var(--font-sans);
+            color: var(--foreground);
+            -webkit-font-smoothing: antialiased;
+
             /* Disable native touch gestures (pan/zoom) so they don't
                compete with the swipe handling below - previously
                commented out, which let the browser's own gesture
@@ -25,44 +57,187 @@
             overflow: hidden;
             touch-action: none;
             overscroll-behavior: none;
-
         }
+
+        .topbar {
+            position: sticky;
+            top: 0;
+            z-index: 30;
+            width: 100%;
+            box-sizing: border-box;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border);
+            background-color: color-mix(in oklch, var(--background) 90%, transparent);
+            backdrop-filter: blur(8px);
+            padding: 0.75rem 1rem;
+        }
+
+        .brand {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.25em;
+            color: var(--muted-foreground);
+        }
+
+        .hud {
+            display: flex;
+            gap: 1.25rem;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--muted-foreground);
+        }
+
+        .hud strong {
+            color: var(--foreground);
+            font-weight: 500;
+        }
+
+        main.layout {
+            width: 100%;
+            max-width: 400px;
+            padding: 1.25rem 1rem 2rem;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1.title {
+            align-self: flex-start;
+            margin: 0 0 1rem;
+            font-family: var(--font-display);
+            font-size: 2rem;
+            font-weight: 600;
+            color: var(--foreground);
+        }
+
+        .canvas-frame {
+            position: relative;
+            padding: 10px;
+            border: 1px solid var(--border);
+            background-color: var(--card);
+        }
+
+        /* Drafting corner ticks, same recipe as the shared framework's
+           .corner-ticks - frames the game surface the same way cv.virag.fun
+           frames the portrait photo and ascii.virag.fun frames its (also
+           dark-background) ASCII output. */
+        .corner-ticks {
+            --tick: var(--markup);
+            --tick-len: 14px;
+            --tick-w: 2px;
+            background-image:
+                linear-gradient(var(--tick), var(--tick)),
+                linear-gradient(var(--tick), var(--tick)),
+                linear-gradient(var(--tick), var(--tick)),
+                linear-gradient(var(--tick), var(--tick)),
+                linear-gradient(var(--tick), var(--tick)),
+                linear-gradient(var(--tick), var(--tick)),
+                linear-gradient(var(--tick), var(--tick)),
+                linear-gradient(var(--tick), var(--tick));
+            background-repeat: no-repeat;
+            background-size:
+                var(--tick-len) var(--tick-w),
+                var(--tick-w) var(--tick-len),
+                var(--tick-len) var(--tick-w),
+                var(--tick-w) var(--tick-len),
+                var(--tick-len) var(--tick-w),
+                var(--tick-w) var(--tick-len),
+                var(--tick-len) var(--tick-w),
+                var(--tick-w) var(--tick-len);
+            background-position:
+                left top,
+                left top,
+                right top,
+                right top,
+                left bottom,
+                left bottom,
+                right bottom,
+                right bottom;
+        }
+
         canvas {
-            border: 3px solid #16213e;
-            border-radius: 10px;
+            display: block;
+            border-radius: 4px;
             background: #0f3460;
-            box-shadow: 0 0 20px rgba(0,255,255,0.3);
-        }
-        .score {
-            font-size: 24px;
-            margin: 20px 0;
-            text-shadow: 0 0 10px #00ffff;
-        }
-        .controls {
-            margin-top: 20px;
-            text-align: center;
         }
 
-		.flex-container {
-  			touch-action: none;
-		}
+        .panel-title {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--primary);
+            padding-bottom: 6px;
+            margin-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .panel {
+            border: 1px solid var(--border);
+            background-color: var(--card);
+            padding: 10px 12px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            line-height: 1.5em;
+        }
+
+        #topScoresList {
+            color: var(--muted-foreground);
+        }
+
+        .setting-row {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--muted-foreground);
+            cursor: pointer;
+        }
+
+        .controls {
+            margin-top: 16px;
+            text-align: center;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--muted-foreground);
+        }
+
+        .flex-container {
+            touch-action: none;
+        }
 
         .difficulty-selector {
-            margin: 10px 0 10px 0;
-            font-size: 14px;
-            text-shadow: 0 0 5px #00ffff;
+            margin: 10px 0 0;
+            font-family: var(--font-mono);
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--muted-foreground);
+        }
+
+        .difficulty-selector label {
+            display: block;
+            margin-bottom: 4px;
         }
 
         #difficultySelect:disabled {
             opacity: 0.5;
             cursor: not-allowed;
         }
-        
+
         #difficultySelect {
-            background: #16213e;
-            color: #00ffff;
-            border: 2px solid #00ffff;
-            border-radius: 5px;
+            width: 100%;
+            box-sizing: border-box;
+            background: var(--card);
+            color: var(--foreground);
+            border: 1px solid var(--border);
+            border-radius: 3px;
             padding: 5px;
             /* 16px is the minimum that keeps iOS Safari (and some Android
                browsers) from auto-zooming the viewport on focus - that
@@ -72,41 +247,48 @@
                state - so once triggered, it's stuck zoomed in with no way
                back out. */
             font-size: 16px;
+            font-family: var(--font-sans);
             cursor: pointer;
-            box-shadow: 0 0 10px rgba(0,255,255,0.3);
         }
-        
+
         #difficultySelect:hover {
-            box-shadow: 0 0 20px rgba(0,255,255,0.6);
+            border-color: var(--primary);
+        }
+
+        #gameOver {
+            color: var(--markup);
+        }
+
+        .version {
+            margin-top: 4px;
+            font-family: var(--font-mono);
+            font-size: 10px;
+            letter-spacing: 0.1em;
+            color: var(--muted-foreground);
         }
 
         @media (max-width: 480px) {
-            .score {
-                display: flex !important;
-                flex-wrap: nowrap !important;
-            }
-            
             .flex-container {
                 gap: 5px !important;
                 width: 95vw !important;
                 justify-content: center !important;
             }
-            
-            .leaderboard, .settings { 
+
+            .leaderboard, .settings {
                 width: 48% !important;
-                font-size: 12px !important;
+                font-size: 11px !important;
             }
 
             #topScoresList { font-size: 10px !important; }
-            
-            canvas { 
-                width: 95vw !important; 
-                height: 95vw !important; 
-                max-width: 400px; 
-                max-height: 400px; 
+
+            canvas {
+                width: 95vw !important;
+                height: 95vw !important;
+                max-width: 380px;
+                max-height: 380px;
             }
         }
-        
+
     </style>
 </head>
 <body>
@@ -116,52 +298,61 @@
     <audio id="foodEatingSound" preload="auto">
         <source src="food.mp3" type="audio/mpeg">
     </audio>
-    
-    <div class="score">
-        Score: <span id="score">0</span> | 
-        Level: <span id="level">1</span>
-    </div>
 
-    <!-- Flexbox side-by-side -->
-    <div class="flex-container" style="width: 100%; max-width: 400px; margin: 10px 0; display: flex; gap: 30px; align-items: flex-start">
-        <!-- Leaderboard -->
-        <div class="leaderboard" style="font-size: 14px; margin: 10px 0 10px 0; text-shadow: 0 0 5px #00ffff; line-height: 1.3em; text-align: left; width: 200px;">
-            Top 5 - <span id="currentDifficulty">Viper</span>:<br>
-            <div id="topScoresList" style="margin-top: 2px; font-size: 12px;">
-                1. 0<br>2. 0<br>3. 0<br>4. 0<br>5. 0
+    <header class="topbar">
+        <span class="brand">Snake</span>
+        <div class="hud">
+            <span>Score <strong id="score">0</strong></span>
+            <span>Level <strong id="level">1</strong></span>
+        </div>
+    </header>
+
+    <main class="layout">
+        <h1 class="title">Snake</h1>
+
+        <!-- Flexbox side-by-side -->
+        <div class="flex-container" style="width: 100%; margin: 0 0 12px; display: flex; gap: 12px; align-items: flex-start">
+            <!-- Leaderboard -->
+            <div class="leaderboard panel" style="flex: 1;">
+                <div class="panel-title">Top 5 &middot; <span id="currentDifficulty">Viper</span></div>
+                <div id="topScoresList">
+                    1. 0<br>2. 0<br>3. 0<br>4. 0<br>5. 0
+                </div>
+            </div>
+
+            <!-- Settings -->
+            <div class="settings panel" style="flex: 1;">
+                <div class="panel-title">Settings</div>
+                <label class="setting-row">
+                    <input type="checkbox" id="soundToggle"> Sound on
+                </label>
+                <div class="difficulty-selector" id="difficultySelector">
+                    <label>Difficulty</label>
+                    <select id="difficultySelect">
+                        <option value=0.00 selected>🐍 Viper</option>
+                        <option value=0.25>⚡ Python</option>
+                        <option value=0.50>💀 Anaconda</option>
+                        <option value=1.00>🔥 King Cobra</option>
+                    </select>
+                </div>
             </div>
         </div>
-    
-        <!-- Settings -->
-        <div class="settings" style="font-size: 14px; margin: 10px 0 10px 0; text-shadow: 0 0 5px #00ffff; line-height: 1.3em; text-align: left; width: 200px;">
-            Settings:<br>
-            <label style="font-size: 12px;">
-                <input type="checkbox" id="soundToggle" style="cursor: pointer;"> Sound on
-            </label>
-            <div class="difficulty-selector" id="difficultySelector">
-                <label>Difficulty: </label>
-                <select id="difficultySelect">
-                    <option value=0.00 selected>🐍 Viper</option>
-                    <option value=0.25>⚡ Python</option>
-                    <option value=0.50>💀 Anaconda</option>
-                    <option value=1.00>🔥 King Cobra</option>
-                </select>
+
+        <!-- Game canvas -->
+        <div class="canvas-frame corner-ticks">
+            <canvas id="gameCanvas" width="400" height="400"></canvas>
+        </div>
+
+        <div class="controls">
+            <div>Use ARROW KEYS or SWIPE to move</div>
+            <div id="gameOver" style="height: 30px; visibility: visible; font-size:14px;">
+                Game Over! Double-tap or press R to restart.
             </div>
         </div>
-    </div>
-    
-    <!-- Game canvas -->
-    <canvas id="gameCanvas" width="400" height="400"></canvas>
 
-    <div class="controls">
-        <div>Use ARROW KEYS or SWIPE to move</div>
-        <div id="gameOver" style="height: 30px; visibility: visible; color:#ff0000; font-size:20px;">
-            Game Over! Double-tap or press R to restart.
-        </div>
-    </div>
+        <div class="version">v<span id="version">0.3.38</span></div>
+    </main>
 
-    <div class="version">v<span id="version">0.3.38</span></div>
-    
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
@@ -607,12 +798,28 @@
             if (e.keyCode === DOWN  && lastDir.dy !== -1 && lastDir.dy !== 1)   { inputQueue.push({dx: 0, dy: 1}); console.log("DOWN"); }
         });
 
-        // Handle touch screen input
+        // Handle touch screen input - bound to the whole document, not just
+        // the canvas, so a swipe started anywhere on the page (e.g. near
+        // the bezel/edge on a tablet, past the canvas's own bounds) still
+        // steers the snake, the same way arrow keys work regardless of
+        // where focus is. The one exception is the settings panel's actual
+        // form controls (the difficulty <select>, the sound <input>, and
+        // their <label>s) - those need their own native touch handling
+        // (opening the dropdown, toggling the checkbox) to keep working,
+        // so a touch that starts on one of them is left alone entirely.
         let touchStartX = 0;
         let touchStartY = 0;
+        let touchIsOnControl = false;
         const minSwipeDistance = 20;
 
-        canvas.addEventListener('touchstart', (e) => {
+        function isFormControl(target) {
+            return target.closest('select, input, label') !== null;
+        }
+
+        document.addEventListener('touchstart', (e) => {
+            touchIsOnControl = isFormControl(e.target);
+            if (touchIsOnControl) return;
+
             e.preventDefault();
             touchStartX = e.touches[0].clientX;
             touchStartY = e.touches[0].clientY;
@@ -640,7 +847,8 @@
         // without this check a long swipe piles up a backlog of redundant
         // same-direction entries that the snake visibly lags behind while
         // it works through.
-        canvas.addEventListener('touchmove', (e) => {
+        document.addEventListener('touchmove', (e) => {
+            if (touchIsOnControl) return;
             e.preventDefault();
             if (!gameRunning) return;
 
@@ -674,7 +882,8 @@
             }
         }, { passive: false });
 
-        canvas.addEventListener('touchend', (e) => {
+        document.addEventListener('touchend', (e) => {
+            if (touchIsOnControl) return;
             e.preventDefault();
 
             // Double-tap to restart
