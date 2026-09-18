@@ -106,7 +106,7 @@
 
         main.layout {
             width: 100%;
-            max-width: 400px;
+            max-width: 480px;
             padding: 1.25rem 1rem 2rem;
             box-sizing: border-box;
             display: flex;
@@ -183,6 +183,7 @@
             padding-bottom: 6px;
             margin-bottom: 8px;
             border-bottom: 1px solid var(--border);
+            white-space: nowrap;
         }
 
         .panel {
@@ -279,14 +280,26 @@
 
         @media (max-width: 480px) {
             .flex-container {
-                gap: 5px !important;
-                width: 95vw !important;
+                gap: 4px !important;
+                width: 98vw !important;
                 justify-content: center !important;
             }
 
             .leaderboard, .settings {
-                width: 48% !important;
                 font-size: 11px !important;
+                padding: 8px 8px !important;
+            }
+
+            .leaderboard {
+                width: 60% !important;
+            }
+
+            .leaderboard .panel-title {
+                letter-spacing: 0.08em !important;
+            }
+
+            .settings {
+                width: 38% !important;
             }
 
             #topScoresList { font-size: 10px !important; }
@@ -323,8 +336,8 @@
         <!-- Flexbox side-by-side -->
         <div class="flex-container" style="width: 100%; margin: 0 0 12px; display: flex; gap: 12px; align-items: stretch">
             <!-- Leaderboard -->
-            <div class="leaderboard panel" style="flex: 1;">
-                <div class="panel-title">Top 5<br><span id="currentDifficulty" style="white-space: nowrap;">Viper</span></div>
+            <div class="leaderboard panel" style="flex: 1.5;">
+                <div class="panel-title">Top 5 &middot; <span id="currentDifficulty">Viper</span></div>
                 <div id="topScoresList">
                     1. 0<br>2. 0<br>3. 0<br>4. 0<br>5. 0
                 </div>
