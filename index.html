@@ -625,6 +625,14 @@
         // this used to) so a swipe and a still-pending keyboard turn
         // resolve in the order they happened, not by whichever line of
         // code ran last.
+        //
+        // Only pushed when the resolved direction actually differs from
+        // the current one - a single long drag fires touchmove many times
+        // and keeps re-crossing the 20px threshold in the *same* direction
+        // as it goes, and the queue only drains one entry per game tick, so
+        // without this check a long swipe piles up a backlog of redundant
+        // same-direction entries that the snake visibly lags behind while
+        // it works through.
         canvas.addEventListener('touchmove', (e) => {
             e.preventDefault();
             if (!gameRunning) return;
@@ -635,17 +643,22 @@
             const deltaY = touchY - touchStartY;
             const lastDir = inputQueue.length > 0 ? inputQueue.at(-1) : { dx, dy };
             let turned = true;
+            let newDir = null;
 
             if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > minSwipeDistance) {
-                if (deltaX > 0 && lastDir.dx !== -1) { inputQueue.push({ dx: 1, dy: 0 }); }  // Right
-                else if (deltaX < 0 && lastDir.dx !== 1) { inputQueue.push({ dx: -1, dy: 0 }); }  // Left
+                if (deltaX > 0 && lastDir.dx !== -1) newDir = { dx: 1, dy: 0 };  // Right
+                else if (deltaX < 0 && lastDir.dx !== 1) newDir = { dx: -1, dy: 0 };  // Left
                 else turned = false;
             } else if (Math.abs(deltaY) > minSwipeDistance) {
-                if (deltaY > 0 && lastDir.dy !== -1) { inputQueue.push({ dx: 0, dy: 1 }); }  // Down
-                else if (deltaY < 0 && lastDir.dy !== 1) { inputQueue.push({ dx: 0, dy: -1 }); }  // Up
+                if (deltaY > 0 && lastDir.dy !== -1) newDir = { dx: 0, dy: 1 };  // Down
+                else if (deltaY < 0 && lastDir.dy !== 1) newDir = { dx: 0, dy: -1 };  // Up
                 else turned = false;
             } else {
                 turned = false;
+            }
+
+            if (newDir && (newDir.dx !== lastDir.dx || newDir.dy !== lastDir.dy)) {
+                inputQueue.push(newDir);
             }
 
             if (turned) {
