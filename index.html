@@ -64,7 +64,14 @@
             border: 2px solid #00ffff;
             border-radius: 5px;
             padding: 5px;
-            font-size: 14px;
+            /* 16px is the minimum that keeps iOS Safari (and some Android
+               browsers) from auto-zooming the viewport on focus - that
+               auto-zoom isn't blocked by user-scalable=no (only manual
+               pinch/double-tap zoom is), and it doesn't get undone by a
+               reload since it's a browser viewport-zoom state, not page
+               state - so once triggered, it's stuck zoomed in with no way
+               back out. */
+            font-size: 16px;
             cursor: pointer;
             box-shadow: 0 0 10px rgba(0,255,255,0.3);
         }
