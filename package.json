@@ -1,0 +1,18 @@
+{
+  "name": "snake-virag-fun",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "emulators": "firebase emulators:start --only firestore --project demo-snake-virag-fun"
+  },
+  "dependencies": {
+    "firebase": "^10.14.1"
+  },
+  "devDependencies": {
+    "firebase-tools": "^13.29.1",
+    "vite": "^7.1.0"
+  }
+}

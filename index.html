@@ -381,29 +381,42 @@
          which project to talk to. firestore.rules (public read,
          server-validated write, no update/delete ever) is the entire
          access model, same principle as the other virag.fun apps, just
-         without Auth since this is a public game with no login. -->
+         without Auth since this is a public game with no login. Injected
+         at build time from individual FIREBASE_* GitHub Actions secrets
+         anyway, for consistency with the other virag.fun apps. -->
     <script type="module">
-        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js';
+        import { initializeApp } from 'firebase/app';
         import {
             getFirestore, connectFirestoreEmulator, collection, addDoc,
             serverTimestamp, query, where, orderBy, limit, getDocs,
-        } from 'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js';
+        } from 'firebase/firestore';
 
+        const env = import.meta.env;
         const firebaseConfig = {
-            apiKey: 'REPLACE_ME',
-            authDomain: 'REPLACE_ME.firebaseapp.com',
-            projectId: 'REPLACE_ME',
-            storageBucket: 'REPLACE_ME.firebasestorage.app',
-            messagingSenderId: 'REPLACE_ME',
-            appId: 'REPLACE_ME',
+            apiKey: env.VITE_FIREBASE_API_KEY,
+            authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
+            projectId: env.VITE_FIREBASE_PROJECT_ID,
+            storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
+            messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+            appId: env.VITE_FIREBASE_APP_ID,
         };
 
-        const firebaseApp = initializeApp(firebaseConfig);
+        // Local dev always talks to the Firestore emulator (`npx
+        // firebase-tools emulators:start --only firestore`), under this
+        // fixed demo project id, independent of firebaseConfig above - so
+        // `bun run dev` works before that config has real values filled
+        // in. (The emulator partitions Firestore strictly by project id,
+        // so this must match firestore.rules' emulator setup exactly.)
+        const LOCAL_EMULATOR_PROJECT_ID = 'demo-snake-virag-fun';
+
+        const firebaseApp = initializeApp(
+            import.meta.env.DEV
+                ? { projectId: LOCAL_EMULATOR_PROJECT_ID, apiKey: 'demo-emulator-key' }
+                : firebaseConfig
+        );
         const db = getFirestore(firebaseApp);
 
-        // Local dev only - talk to the emulator instead of the real
-        // project. See firestore.rules for the emulator setup.
-        if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+        if (import.meta.env.DEV) {
             connectFirestoreEmulator(db, '127.0.0.1', 8080);
         }
 

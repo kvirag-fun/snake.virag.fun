@@ -1,8 +1,8 @@
 # Snake
 
-A classic Snake game, built as a single self-contained `index.html` — no
-build step, no dependencies, just open it in a browser. Live at
-[virag.fun](https://www.virag.fun).
+A classic Snake game, built as a single self-contained `index.html`
+(markup, styles, and all the game logic in one file — no framework),
+built and deployed with Vite. Live at [virag.fun](https://www.virag.fun).
 
 ## Features
 
@@ -23,19 +23,35 @@ build step, no dependencies, just open it in a browser. Live at
 
 ## Running locally
 
-No build step — just serve the directory and open it:
+```
+bun install
+bun run dev
+```
+
+Local dev always talks to the Firestore emulator, not the real project
+(see "Global leaderboard" below) — it works before any real Firebase
+config exists.
+
+## Building
 
 ```
-python3 -m http.server 8000
+bun run build
 ```
 
-Then visit `http://localhost:8000/index.html`.
+Outputs to `dist/`. The Firebase config is baked in from the
+`VITE_FIREBASE_*` environment variables present at build time (see
+below) — set them locally to test a production build against the real
+project, or leave them unset to test the "Firestore unreachable"
+fallback path.
 
 ## Deployment
 
-Plain GitHub Pages, deployed from the `main` branch (see the `CNAME`
-file for the custom domain) — no GitHub Actions workflow, no build
-step. Pushing to `main` is the entire deploy process.
+GitHub Pages, deployed via GitHub Actions
+(`.github/workflows/deploy.yml`) on every push to `main`: build with
+Vite, inject the `VITE_FIREBASE_*` vars from repository secrets, deploy
+`dist/` to Pages. The repo's Pages source must be set to "GitHub
+Actions" (Settings → Pages → Build and deployment), not "Deploy from a
+branch".
 
 ## Global leaderboard (Firestore)
 
@@ -49,13 +65,24 @@ the board can actually produce, `createdAt` must be the server's own
 timestamp), and nothing can ever be updated or deleted once written.
 
 The Firebase web config in `index.html` isn't a secret (it only says
-which project to talk to - the rule above is what actually protects the
-data), so unlike cv.virag.fun it's just hardcoded directly rather than
-injected at build time - this repo has no build step to inject it with.
+which project to talk to — the rule above is what actually protects the
+data). It's injected at build time from individual repository secrets
+anyway, for consistency with the other virag.fun apps:
+`FIREBASE_API_KEY`, `FIREBASE_AUTH_DOMAIN`, `FIREBASE_PROJECT_ID`,
+`FIREBASE_STORAGE_BUCKET`, `FIREBASE_MESSAGING_SENDER_ID`,
+`FIREBASE_APP_ID` — add these under Settings → Secrets and variables →
+Actions.
 
-Local testing uses the Firestore emulator (`npx firebase-tools
-emulators:start --only firestore`, pointed at `firestore.rules`) rather
-than a real project - `index.html` auto-detects `localhost`/`127.0.0.1`
+Local dev and testing use the Firestore emulator instead of a real
+project:
+
+```
+bun run emulators
+```
+
+(equivalent to `firebase emulators:start --only firestore`, using
+`firebase.json` / `.firebaserc` / `firestore.rules` already in this
+repo) — `index.html` auto-detects Vite's dev mode (`import.meta.env.DEV`)
 and connects to the emulator instead of production.
 
 ## Files
@@ -64,8 +91,10 @@ and connects to the emulator instead of production.
 | --- | --- |
 | `index.html` | The entire game — markup, styles, and logic in one file |
 | `firestore.rules` | Security rules for the global leaderboard (see above) |
-| `CNAME` | Custom domain for GitHub Pages |
-| `tab_icon.ico` | Favicon |
-| `snake_splash_screen.png` | Splash screen shown before a run starts |
-| `snake_gameover_wall.png`, `snake_gameover_self.png`, `snake_gameover_rotten.png` | Game-over screens, one per death cause |
-| `food.mp3`, `ugh_05s.mp3` | Sound effects (eating food, game over) |
+| `firebase.json`, `.firebaserc` | Local emulator config for `firestore.rules` |
+| `vite.config.js` | Build config |
+| `public/CNAME` | Custom domain for GitHub Pages |
+| `public/tab_icon.ico` | Favicon |
+| `public/snake_splash_screen.png` | Splash screen shown before a run starts |
+| `public/snake_gameover_wall.png`, `public/snake_gameover_self.png`, `public/snake_gameover_rotten.png` | Game-over screens, one per death cause |
+| `public/food.mp3`, `public/ugh_05s.mp3` | Sound effects (eating food, game over) |
