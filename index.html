@@ -55,10 +55,15 @@
             color: var(--foreground);
             -webkit-font-smoothing: antialiased;
 
-            /* Disable native touch gestures (pan/zoom) so they don't
-               compete with the swipe handling below - previously
-               commented out, which let the browser's own gesture
-               recognizer add its own latency/jank on top of the game's. */
+        }
+
+        /* Disable native touch gestures (pan/zoom/scroll) only while a run
+           is actually in progress, so they don't compete with the swipe
+           handling below - previously unconditional on body at all times,
+           which meant the page couldn't be scrolled at all outside of
+           gameplay (splash screen, leaderboard, settings, game over) on a
+           device with no other way to scroll. */
+        body.playing {
             overflow: hidden;
             touch-action: none;
             overscroll-behavior: none;
@@ -216,7 +221,12 @@
             color: var(--muted-foreground);
         }
 
-        .flex-container {
+        /* Same reasoning as body.playing above - only disable native touch
+           gestures over the leaderboard/settings row while a run is
+           actually in progress (so a swipe starting there still steers,
+           per the "swipe from anywhere, not just the canvas" requirement),
+           not unconditionally. */
+        body.playing .flex-container {
             touch-action: none;
         }
 
@@ -864,6 +874,7 @@
         // Game over
         function gameOver(cause) {
             gameRunning = false;
+            document.body.classList.remove('playing');
             deathCause = cause;
             showGameOverImage = true;
             gameOverElement.textContent =
@@ -894,6 +905,7 @@
             updateLevelDisplay(score);
             gameOverElement.style.visibility = 'hidden';
             gameRunning = true;
+            document.body.classList.add('playing');
 
             if (splashLoaded) {
                 splashLoaded = false
@@ -956,7 +968,12 @@
 
         document.addEventListener('touchstart', (e) => {
             touchIsOnControl = isFormControl(e.target);
-            if (touchIsOnControl) return;
+            // Only hijack the touch when a run is actually in progress -
+            // otherwise (splash screen, leaderboard, settings, game over)
+            // there's nothing to steer, and blocking the default action
+            // here means the page can't be scrolled at all on a device
+            // that can't scroll any other way.
+            if (touchIsOnControl || !gameRunning) return;
 
             e.preventDefault();
             touchStartX = e.touches[0].clientX;
@@ -986,9 +1003,8 @@
         // same-direction entries that the snake visibly lags behind while
         // it works through.
         document.addEventListener('touchmove', (e) => {
-            if (touchIsOnControl) return;
+            if (touchIsOnControl || !gameRunning) return;
             e.preventDefault();
-            if (!gameRunning) return;
 
             const touchX = e.touches[0].clientX;
             const touchY = e.touches[0].clientY;
