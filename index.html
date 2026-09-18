@@ -386,10 +386,14 @@
          anyway, for consistency with the other virag.fun apps. -->
     <script type="module">
         import { initializeApp } from 'firebase/app';
+        // The "lite" Firestore SDK - no realtime listeners, no offline
+        // persistence, no WebChannel streaming setup - just one-shot
+        // reads/writes over plain HTTP, which is all this ever does.
+        // Meaningfully smaller and faster to initialize than the full SDK.
         import {
             getFirestore, connectFirestoreEmulator, collection, addDoc,
             serverTimestamp, query, where, orderBy, limit, getDocs,
-        } from 'firebase/firestore';
+        } from 'firebase/firestore/lite';
 
         const env = import.meta.env;
         const firebaseConfig = {
