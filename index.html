@@ -355,7 +355,7 @@
 
         <div class="controls">
             <div>Use ARROW KEYS or SWIPE to move</div>
-            <div id="gameOver" style="height: 30px; visibility: visible; font-size:14px;">
+            <div id="gameOver" style="height: 30px; visibility: hidden; font-size:14px;">
                 Game Over! Double-tap or press R to restart.
             </div>
         </div>
@@ -418,11 +418,35 @@
         //Handle splash screen image
         const splashImage = new Image();
         let splashLoaded = false;
-        
+
         splashImage.onload = () => {
             splashLoaded = true;
         };
         splashImage.src = 'snake_splash_screen.png';
+
+        // Same art, dead (X) eye - shown instead of the splash after an
+        // actual game over, so it's unmistakable at a glance that this run
+        // ended, not just that the game hasn't started yet.
+        const gameOverImage = new Image();
+        let gameOverLoaded = false;
+        let showGameOverImage = false;
+
+        gameOverImage.onload = () => {
+            gameOverLoaded = true;
+        };
+        gameOverImage.src = 'snake_gameover_screen.png';
+
+        // Distinguishes the 3 ways a run can end - set by gameOver(), read
+        // by drawGame() (message text) and restart() (cleared for the next
+        // run). Kept as data rather than three separate messages scattered
+        // across each collision check, so drawGame()'s copy is the one
+        // place that has to know the actual wording.
+        const DEATH_MESSAGES = {
+            wall: 'You ran into a wall.',
+            self: 'You ran into yourself.',
+            rotten: 'You ate a rotten apple.',
+        };
+        let deathCause = null;
         
         function getDifficultyKey() {
             const difficultySelect = document.getElementById('difficultySelect');
@@ -561,6 +585,25 @@
             }
         }
         
+        // Draws an image centered in the canvas, scaled to fit inside it -
+        // shared by the splash and game-over screens, which both fit a
+        // square 1024x1024 image into the (possibly non-square once CSS
+        // media queries resize it) canvas element.
+        function drawFitted(image) {
+            const iw = image.width;
+            const ih = image.height;
+            const cw = canvas.width;
+            const ch = canvas.height;
+
+            const scale = Math.min(cw / iw, ch / ih);
+            const dw = iw * scale;
+            const dh = ih * scale;
+            const dx = (cw - dw) / 2;
+            const dy = (ch - dh) / 2;
+
+            ctx.drawImage(image, dx, dy, dw, dh);
+        }
+
         // Draw game elements
         function drawGame() {
             // Clear canvas
@@ -568,21 +611,18 @@
             ctx.fillStyle = CANVAS_BG;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // If game is not running, draw splash image and return
+            // Not running because a run just ended in death - the dead-eyed
+            // variant, not the original splash, so it's obvious at a glance
+            // this is "game over", not "hasn't started yet".
+            if (!gameRunning && showGameOverImage && gameOverLoaded) {
+                drawFitted(gameOverImage);
+                return;
+            }
+
+            // Not running and never played yet (or about to start a fresh
+            // run) - the original splash screen.
             if (!gameRunning && splashLoaded) {
-                // Draw centered in the canvas; scale if needed
-                const iw = splashImage.width;
-                const ih = splashImage.height;
-                const cw = canvas.width;
-                const ch = canvas.height;
-        
-                const scale = Math.min(cw / iw, ch / ih); // fit inside canvas
-                const dw = iw * scale;
-                const dh = ih * scale;
-                const dx = (cw - dw) / 2;
-                const dy = (ch - dh) / 2;
-        
-                ctx.drawImage(splashImage, dx, dy, dw, dh);
+                drawFitted(splashImage);
                 return;
             }
 
@@ -670,14 +710,14 @@
             
             // Check wall collision
             if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
-                gameOver();
+                gameOver('wall');
                 return;
             }
 
             // Check self collision
             for (let segment of snake) {
                 if (head.x === segment.x && head.y === segment.y) {
-                    gameOver();
+                    gameOver('self');
                     return;
                 }
             }
@@ -685,7 +725,7 @@
             // Check bad food collision
             for (const badFood of badFoodList) {
                 if (head.x === badFood.x && head.y === badFood.y) {
-                    gameOver();
+                    gameOver('rotten');
                     return;
                 }
             }
@@ -745,8 +785,12 @@
         }
         
         // Game over
-        function gameOver() {
+        function gameOver(cause) {
             gameRunning = false;
+            deathCause = cause;
+            showGameOverImage = true;
+            gameOverElement.textContent =
+                `Game Over! ${DEATH_MESSAGES[cause]} Double-tap or press R to restart.`;
             gameOverElement.style.visibility = 'visible';
 
             // Update leaderboard with FINAL score only
@@ -777,7 +821,9 @@
             if (splashLoaded) {
                 splashLoaded = false
             }
-            
+            showGameOverImage = false;
+            deathCause = null;
+
             // Toggle difficulty selector to ON
             toggleDifficultySelector();
             
