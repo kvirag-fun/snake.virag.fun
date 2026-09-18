@@ -616,10 +616,8 @@
                 const globalScores = await fetchGlobalTop5(difficultySelect.value);
                 renderScores(globalScores);
             } catch (e) {
-                // TEMPORARY diagnostic - surfaces the actual error even
-                // without devtools access, to track down why the global
-                // leaderboard isn't showing. Remove once diagnosed.
-                alert('Global leaderboard fetch failed: ' + (e && e.message ? e.message : e));
+                // Offline or Firestore unreachable - the local scores
+                // already rendered above are the fallback.
             }
         }
 
