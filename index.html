@@ -603,41 +603,54 @@
         // Handle touch screen input
         let touchStartX = 0;
         let touchStartY = 0;
-        let touchDirectionSet = false;
         const minSwipeDistance = 20;
 
         canvas.addEventListener('touchstart', (e) => {
             e.preventDefault();
             touchStartX = e.touches[0].clientX;
             touchStartY = e.touches[0].clientY;
-            touchDirectionSet = false;
         }, { passive: false });
 
         // Resolve the swipe as soon as the finger has moved far enough to
         // tell direction, not on touchend - waiting for the finger to lift
         // stacks a full gesture's worth of delay (down, travel, lift) on
         // top of the travel itself, which is what actually made this feel
-        // laggy next to keydown's instant response. Only the first
-        // qualifying move per gesture counts (touchDirectionSet), so a
-        // finger that keeps sliding after the turn doesn't re-trigger.
-        // Pushed through the same inputQueue keyboard uses (rather than
-        // writing dx/dy directly, as this used to) so a swipe and a
-        // still-pending keyboard turn resolve in the order they happened,
-        // not by whichever line of code ran last.
+        // laggy next to keydown's instant response. After a turn triggers,
+        // the reference point resets to wherever the finger is right now
+        // (rather than a one-shot flag for the whole gesture), so a single
+        // continuous drag can chain multiple turns - e.g. right then down
+        // then left - without ever lifting the finger, the same way you'd
+        // tap several arrow keys in a row. Pushed through the same
+        // inputQueue keyboard uses (rather than writing dx/dy directly, as
+        // this used to) so a swipe and a still-pending keyboard turn
+        // resolve in the order they happened, not by whichever line of
+        // code ran last.
         canvas.addEventListener('touchmove', (e) => {
             e.preventDefault();
-            if (!gameRunning || touchDirectionSet) return;
+            if (!gameRunning) return;
 
-            const deltaX = e.touches[0].clientX - touchStartX;
-            const deltaY = e.touches[0].clientY - touchStartY;
+            const touchX = e.touches[0].clientX;
+            const touchY = e.touches[0].clientY;
+            const deltaX = touchX - touchStartX;
+            const deltaY = touchY - touchStartY;
             const lastDir = inputQueue.length > 0 ? inputQueue.at(-1) : { dx, dy };
+            let turned = true;
 
             if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > minSwipeDistance) {
-                if (deltaX > 0 && lastDir.dx !== -1) { inputQueue.push({ dx: 1, dy: 0 }); touchDirectionSet = true; }  // Right
-                else if (deltaX < 0 && lastDir.dx !== 1) { inputQueue.push({ dx: -1, dy: 0 }); touchDirectionSet = true; }  // Left
+                if (deltaX > 0 && lastDir.dx !== -1) { inputQueue.push({ dx: 1, dy: 0 }); }  // Right
+                else if (deltaX < 0 && lastDir.dx !== 1) { inputQueue.push({ dx: -1, dy: 0 }); }  // Left
+                else turned = false;
             } else if (Math.abs(deltaY) > minSwipeDistance) {
-                if (deltaY > 0 && lastDir.dy !== -1) { inputQueue.push({ dx: 0, dy: 1 }); touchDirectionSet = true; }  // Down
-                else if (deltaY < 0 && lastDir.dy !== 1) { inputQueue.push({ dx: 0, dy: -1 }); touchDirectionSet = true; }  // Up
+                if (deltaY > 0 && lastDir.dy !== -1) { inputQueue.push({ dx: 0, dy: 1 }); }  // Down
+                else if (deltaY < 0 && lastDir.dy !== 1) { inputQueue.push({ dx: 0, dy: -1 }); }  // Up
+                else turned = false;
+            } else {
+                turned = false;
+            }
+
+            if (turned) {
+                touchStartX = touchX;
+                touchStartY = touchY;
             }
         }, { passive: false });
 
