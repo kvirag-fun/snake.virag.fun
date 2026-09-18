@@ -42,4 +42,5 @@ step. Pushing to `main` is the entire deploy process.
 | `CNAME` | Custom domain for GitHub Pages |
 | `tab_icon.ico` | Favicon |
 | `snake_splash_screen.png` | Splash screen shown before a run starts |
+| `snake_gameover_wall.png`, `snake_gameover_self.png`, `snake_gameover_rotten.png` | Game-over screens, one per death cause |
 | `food.mp3`, `ugh_05s.mp3` | Sound effects (eating food, game over) |

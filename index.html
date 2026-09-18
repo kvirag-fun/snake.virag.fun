@@ -426,21 +426,30 @@
 
         // Same art, dead (X) eye - shown instead of the splash after an
         // actual game over, so it's unmistakable at a glance that this run
-        // ended, not just that the game hasn't started yet.
-        const gameOverImage = new Image();
-        let gameOverLoaded = false;
+        // ended, not just that the game hasn't started yet. One image per
+        // death cause, each with its own distinguishing mark.
+        const GAME_OVER_SOURCES = {
+            wall: 'snake_gameover_wall.png',
+            self: 'snake_gameover_self.png',
+            rotten: 'snake_gameover_rotten.png',
+        };
+        const gameOverImages = {};
+        const gameOverLoaded = {};
         let showGameOverImage = false;
 
-        gameOverImage.onload = () => {
-            gameOverLoaded = true;
-        };
-        gameOverImage.src = 'snake_gameover_screen.png';
+        for (const cause of Object.keys(GAME_OVER_SOURCES)) {
+            const image = new Image();
+            gameOverLoaded[cause] = false;
+            image.onload = () => {
+                gameOverLoaded[cause] = true;
+            };
+            image.src = GAME_OVER_SOURCES[cause];
+            gameOverImages[cause] = image;
+        }
 
         // Distinguishes the 3 ways a run can end - set by gameOver(), read
-        // by drawGame() (message text) and restart() (cleared for the next
-        // run). Kept as data rather than three separate messages scattered
-        // across each collision check, so drawGame()'s copy is the one
-        // place that has to know the actual wording.
+        // by drawGame() (which image/message to show) and restart() (cleared
+        // for the next run).
         const DEATH_MESSAGES = {
             wall: 'You ran into a wall.',
             self: 'You ran into yourself.',
@@ -614,8 +623,8 @@
             // Not running because a run just ended in death - the dead-eyed
             // variant, not the original splash, so it's obvious at a glance
             // this is "game over", not "hasn't started yet".
-            if (!gameRunning && showGameOverImage && gameOverLoaded) {
-                drawFitted(gameOverImage);
+            if (!gameRunning && showGameOverImage && deathCause && gameOverLoaded[deathCause]) {
+                drawFitted(gameOverImages[deathCause]);
                 return;
             }
 
