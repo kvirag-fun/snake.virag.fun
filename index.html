@@ -423,6 +423,12 @@
             margin-top: 4px;
         }
 
+        .ouroboros-overlay .ouroboros-continue-hint {
+            font-size: 11px;
+            margin-top: 10px;
+            opacity: 0.85;
+        }
+
         /* Same reasoning as body.playing above - only disable native touch
            gestures over the leaderboard/settings row while a run is
            actually in progress (so a swipe starting there still steers,
@@ -567,6 +573,7 @@
             <div id="ouroborosOverlay" class="ouroboros-overlay" hidden>
                 <div class="ouroboros-title">Ouroboros Unlocked!</div>
                 <div class="ouroboros-bonus">+500</div>
+                <div class="ouroboros-continue-hint">Double-tap or press R to continue.</div>
             </div>
         </div>
     </main>
@@ -1170,7 +1177,10 @@
                 return;
             }
 
-            if (ouroborosWaiting) {
+            // The rays are part of the "not yet dismissed" phase, same as
+            // the text overlay - both should disappear together on the
+            // double-tap, well before movement actually resumes.
+            if (ouroborosWaiting && !ouroborosOverlayDismissed) {
                 drawOuroborosRays();
             }
 
@@ -1466,6 +1476,15 @@
                 return; // Don't process direction change after restart
             }
 
+            // R dismisses the Ouroboros overlay, the same as a double-tap -
+            // it isn't a direction, so (unlike an arrow key) it only
+            // dismisses; a swipe or arrow key afterwards sets the first move.
+            if (e.keyCode === R && ouroborosWaiting && !ouroborosOverlayDismissed && e.target.tagName !== 'INPUT') {
+                ouroborosOverlayDismissed = true;
+                hideOuroborosOverlay();
+                return;
+            }
+
             if (!gameRunning) return;
 
             // Touch requires a double-tap to dismiss the Ouroboros overlay
@@ -1618,9 +1637,10 @@
             }
 
             // The Ouroboros rays rotate against the clock, not the game's
-            // own tick rate - redraw every frame while they're up so the
-            // rotation is smooth instead of stepping once per game tick.
-            if (needsRedraw || ouroborosWaiting) {
+            // own tick rate - redraw every frame while they're up (i.e.
+            // before the double-tap dismisses them) so the rotation is
+            // smooth instead of stepping once per game tick.
+            if (needsRedraw || (ouroborosWaiting && !ouroborosOverlayDismissed)) {
                 drawGame();
                 needsRedraw = false;
             }
