@@ -73,20 +73,21 @@ a single run can earn all three.
 - **Basilisk**: appears the instant you swipe to resume after
   Ouroboros's own pause, on one of the 8 tiles surrounding the board's
   center (a 3x3 area minus the middle, picked at random each time - see
-  `BASILISK_SPAWN_OFFSETS`/`spawnBasilisk()`), gazing a wall of
-  stone-gray tiles from there out to the board edge. A side tile gazes
-  straight outward in that same direction; a corner tile doesn't gaze
-  diagonally - it picks one of its two component directions 50/50 -
-  so the wall is always a straight line, and (deliberately) never
-  originates at the center itself, which is where a forgiven death
-  always respawns. Touching any tile of the wall, including its origin,
-  is a death like any wall (a banked Ouroboros life still forgives it,
-  same as any other death). The wall stays up until 15 apples have been
-  eaten since it spawned (`BASILISK_FOOD_COUNT`) - not 15 raw moves, so
-  circling in place can't clear it for free, you have to actually keep
-  playing. Surviving to see it clear is the achievement: same
-  pause/rays treatment, +1500, stone gray, 🗿 badge. Only ever spawns
-  once per run.
+  `BASILISK_SPAWN_OFFSETS`/`spawnBasilisk()`), gazing a wall out to the
+  board edge. The origin tile is its head - stone gray, with two purple
+  eyes; the rest of the line is the gaze itself, drawn in purple, since
+  that's the part you actually can't enter. A side tile gazes straight
+  outward in that same direction; a corner tile doesn't gaze diagonally
+  - it picks one of its two component directions 50/50 - so the wall is
+  always a straight line, and (deliberately) never originates at the
+  center itself, which is where a forgiven death always respawns.
+  Touching any tile of the wall, including its head, is a death like
+  any wall (a banked Ouroboros life still forgives it, same as any
+  other death). The wall stays up until 15 apples have been eaten since
+  it spawned (`BASILISK_FOOD_COUNT`) - not 15 raw moves, so circling in
+  place can't clear it for free, you have to actually keep playing.
+  Surviving to see it clear is the achievement: same pause/rays
+  treatment, +1500, stone gray, 🗿 badge. Only ever spawns once per run.
 
 Whichever of the three fired most recently wins the snake's color for
 the rest of the run, and a run that earns more than one shows all of

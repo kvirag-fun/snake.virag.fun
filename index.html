@@ -1317,18 +1317,34 @@
                 drawSpecialRays(specialEventKind);
             }
 
-            // Basilisk's gaze wall - drawn as stone blocks, under the
-            // food/snake layers below.
+            // Basilisk's gaze wall, under the food/snake layers below - the
+            // origin tile is its stone-gray head (with two purple eyes),
+            // the rest of the line is the gaze itself, in purple - the
+            // part you actually can't enter.
             if (basiliskActive) {
-                for (const seg of basiliskWall) {
+                basiliskWall.forEach((seg, i) => {
                     const px = seg.x * gridSize;
                     const py = seg.y * gridSize;
-                    ctx.fillStyle = '#6E6E66';  // Stone gray
-                    ctx.fillRect(px, py, gridSize, gridSize);
-                    ctx.strokeStyle = '#4A4A42';  // Mortar lines between blocks
-                    ctx.lineWidth = 1;
-                    ctx.strokeRect(px + 0.5, py + 0.5, gridSize - 1, gridSize - 1);
-                }
+                    if (i === 0) {
+                        ctx.fillStyle = '#6E6E66';  // Stone gray head
+                        ctx.fillRect(px, py, gridSize, gridSize);
+                        ctx.strokeStyle = '#4A4A42';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(px + 0.5, py + 0.5, gridSize - 1, gridSize - 1);
+
+                        ctx.fillStyle = '#C084FC';  // Purple eyes
+                        const eyeSize = 4;
+                        const eyeOffset = 4;
+                        ctx.fillRect(px + eyeOffset, py + eyeOffset, eyeSize, eyeSize);
+                        ctx.fillRect(px + gridSize - eyeOffset - eyeSize, py + eyeOffset, eyeSize, eyeSize);
+                    } else {
+                        ctx.fillStyle = '#6D28D9';  // The gaze - purple
+                        ctx.fillRect(px, py, gridSize, gridSize);
+                        ctx.strokeStyle = '#4C1D95';
+                        ctx.lineWidth = 1;
+                        ctx.strokeRect(px + 0.5, py + 0.5, gridSize - 1, gridSize - 1);
+                    }
+                });
             }
 
             // Draw food with stem
@@ -1720,7 +1736,7 @@
             score += 1500;
             scoreElement.textContent = score;
 
-            beginSpecialEvent('basilisk', 'Basilisk Outlasted!', '+1500');
+            beginSpecialEvent('basilisk', 'Basilisk Outgazed!', '+1500');
         }
 
         function beginSpecialEvent(kind, title, bonus) {
