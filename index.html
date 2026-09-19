@@ -912,7 +912,7 @@
             displayEntries.forEach((entry, index) => {
                 const line = document.createElement('div');
                 line.textContent = entry.nickname
-                    ? `${index + 1}. ${entry.nickname} - ${entry.score}`
+                    ? `${index + 1}. ${entry.score} - ${entry.nickname}`
                     : `${index + 1}. ${entry.score}`;
                 topScoresElement.appendChild(line);
             });
