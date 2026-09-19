@@ -1106,7 +1106,7 @@
             topScoresElement.innerHTML = '';
             displayEntries.forEach((entry, index) => {
                 const line = document.createElement('div');
-                const badge = (entry.ouroboros ? ' ♾️' : '') + (entry.jormungandr ? ' \u{1F409}' : '') + (entry.basilisk ? ' \u{1F5FF}' : '');
+                const badge = (entry.ouroboros ? ' ♾️' : '') + (entry.basilisk ? ' \u{1F5FF}' : '') + (entry.jormungandr ? ' \u{1F409}' : '');
                 line.textContent = entry.nickname
                     ? `${index + 1}. ${entry.score} - ${entry.nickname}${badge}`
                     : `${index + 1}. ${entry.score}${badge}`;
