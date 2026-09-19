@@ -926,10 +926,10 @@
         let dx = 0;
         let dy = 0;
         let score = 0;
-        // Drives level/speed only - excludes the Ouroboros +500 bonus, so
-        // that bonus is a pure reward with no side effect on difficulty
-        // (score itself, shown and submitted to the leaderboard, does
-        // include it).
+        // Drives level/speed only - excludes the Ouroboros/Basilisk/
+        // Jörmungandr bonuses, so they're a pure reward with no side
+        // effect on difficulty (score itself, shown and submitted to the
+        // leaderboard, does include them).
         let pacingScore = 0;
         let gameRunning = false;
         let gameSpeed = 150;
@@ -964,6 +964,16 @@
         // TEMPORARY for testing the "free life" rework - reinstate 80
         // (20% of the 20x20 board) once confirmed working.
         const JORMUNGANDR_LENGTH = 15;
+
+        // Ouroboros can be triggered at any length (4 is the theoretical
+        // floor - the smallest loop where the head can even reach its own
+        // tail tip), but the bonus scales with how big you were when you
+        // took the bite: barely worth it at the bare minimum, full value
+        // once you've risked something real. See triggerOuroboros().
+        const OUROBOROS_MIN_LENGTH = 4;
+        const OUROBOROS_FULL_BONUS_LENGTH = 40;
+        const OUROBOROS_MIN_BONUS = 5;
+        const OUROBOROS_MAX_BONUS = 400;
 
         // Basilisk easter egg - see spawnBasilisk()/triggerBasiliskSurvived()
         // below for the full mechanism.
@@ -1616,17 +1626,26 @@
         // Ouroboros easter egg: biting your own tail the first time in a
         // run doesn't kill you - the length is kept (that's the whole
         // point: it stays consecutive with reaching Jörmungandr, rather
-        // than forcing a rebuild from scratch), +500, and it banks a free
-        // life (see ouroborosLifeAvailable/handleDeath/respawnWithSameLength
-        // below) that forgives whatever kills you next. A deliberate risk
-        // to take on purpose once you're already big, not just a bonus.
-        // Only fires once per game; any later self-collision is a normal
-        // death (or forgiven by the banked life, same as any other death).
+        // than forcing a rebuild from scratch), a scaled bonus (see
+        // OUROBOROS_MIN_LENGTH/OUROBOROS_FULL_BONUS_LENGTH above), and it
+        // banks a free life (see ouroborosLifeAvailable/handleDeath/
+        // respawnWithSameLength below) that forgives whatever kills you
+        // next. Can be triggered at any length, but the scaling means
+        // it's only a real reward once you've risked something real, not
+        // just curled into the smallest possible loop. Only fires once
+        // per game; any later self-collision is a normal death (or
+        // forgiven by the banked life, same as any other death).
         function triggerOuroboros() {
             ouroborosTriggered = true;
             ouroborosLifeAvailable = true;
             snakeColorMode = 'ouroboros';
             updateExtraLifeIndicator();
+
+            const bonusProgress = Math.max(0, Math.min(1,
+                (snake.length - OUROBOROS_MIN_LENGTH) / (OUROBOROS_FULL_BONUS_LENGTH - OUROBOROS_MIN_LENGTH)
+            ));
+            const rawBonus = OUROBOROS_MIN_BONUS + (OUROBOROS_MAX_BONUS - OUROBOROS_MIN_BONUS) * bonusProgress;
+            const bonus = Math.round(rawBonus / 5) * 5;  // round to the nearest 5 points
 
             // Collapse to a single tile at the point of the bite - the
             // snake regrows it one tile per move (see regrowPending in
@@ -1637,10 +1656,10 @@
 
             // Only score (shown/submitted) gets the bonus - pacingScore
             // is untouched, so level and game speed don't jump too.
-            score += 500;
+            score += bonus;
             scoreElement.textContent = score;
 
-            beginSpecialEvent('ouroboros', 'Ouroboros Unlocked!', '+500');
+            beginSpecialEvent('ouroboros', 'Ouroboros Unlocked!', `+${bonus}`);
         }
 
         // Consumes a banked free life if one is available - Ouroboros's

@@ -41,10 +41,19 @@ length threshold while the Basilisk's wall was still up. A single run
 can earn all three.
 
 - **Ouroboros**: biting your own tail tip (not any other self-collision)
-  the first time in a run doesn't kill you - the snake collapses to a
-  single tile at the point of the bite, +500 score, pauses (golden
+  the first time in a run doesn't kill you, at any length - the snake
+  collapses to a single tile at the point of the bite, pauses (golden
   rays, double-tap or `R` to dismiss) until your next move, turns gold,
-  and banks a **free life**: whatever kills the run next (wall,
+  and scores a bonus that scales with how long the snake was at the
+  bite: +5 at the smallest possible loop (4 segments - the geometric
+  floor for the head to even reach its own tail tip) up to +400 once
+  you're 40+ segments long (`OUROBOROS_MIN_LENGTH`/
+  `OUROBOROS_FULL_BONUS_LENGTH`/`OUROBOROS_MIN_BONUS`/
+  `OUROBOROS_MAX_BONUS` in `index.html`, rounded to the nearest 5) -
+  deliberately discourages triggering it the instant it's geometrically
+  possible just to breeze through the easiest, slowest part of a run;
+  the reward only matches the myth once you've actually risked
+  something. It also banks a **free life**: whatever kills the run next (wall,
   self-collision, rotten apple - any cause) is forgiven instead of
   ending it, respawning the snake as a single tile at the board's
   center - the same point a fresh game starts from - with a brief
@@ -113,7 +122,9 @@ can earn all three.
   if this fires mid-regrow after an Ouroboros collapse - Jörmungandr
   doesn't touch the snake's length or position at all. Pause/rays/color
   otherwise the same treatment as Ouroboros, just teal instead of gold
-  and +1000 instead of +500. Leaderboard entries get a 🐉 badge.
+  and a flat +1000 (unlike Ouroboros's scaled bonus - there's nothing
+  to game here, since it already requires a substantial length to
+  reach). Leaderboard entries get a 🐉 badge.
 
 Ouroboros and Jörmungandr each set the snake's color (gold, then teal
 once both have fired); outgazing the Basilisk never does, so it can't
