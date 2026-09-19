@@ -85,6 +85,9 @@
             padding: 0.75rem 1rem;
         }
 
+        /* This game's own name stands in for the usual "Ing. Krisztián
+           Virág" text byline the other virag.fun sites use in this same
+           top-left header slot. */
         .brand {
             font-family: var(--font-mono);
             font-size: 11px;
@@ -118,22 +121,6 @@
             display: flex;
             flex-direction: column;
             align-items: center;
-        }
-
-        .title-row {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin: 0 0 1rem;
-        }
-
-        h1.title {
-            margin: 0;
-            font-family: var(--font-display);
-            font-size: 2rem;
-            font-weight: 600;
-            color: var(--foreground);
         }
 
         .info-button {
@@ -419,7 +406,11 @@
         }
 
         .ouroboros-overlay .ouroboros-bonus {
-            font-size: 12px;
+            /* Same weight/size/spacing as the HUD's score value (.hud
+               strong) - it is one, just delivered as a lump sum. */
+            font-weight: 700;
+            font-size: 14px;
+            letter-spacing: normal;
             margin-top: 4px;
         }
 
@@ -524,19 +515,15 @@
     </audio>
 
     <header class="topbar">
-        <span class="brand">Ing. Krisztián Virág</span>
+        <span class="brand">Snake</span>
         <div class="hud">
             <span>Level <strong id="level">1</strong></span>
             <span>Score <strong id="score">0</strong></span>
         </div>
+        <button type="button" id="infoButton" class="info-button" aria-label="Controls and rules" aria-haspopup="dialog">i</button>
     </header>
 
     <main class="layout">
-        <div class="title-row">
-            <h1 class="title">Snake</h1>
-            <button type="button" id="infoButton" class="info-button" aria-label="Controls and rules" aria-haspopup="dialog">i</button>
-        </div>
-
         <!-- Flexbox side-by-side -->
         <div class="flex-container" style="width: 100%; margin: 0 0 12px; display: flex; gap: 12px; align-items: stretch">
             <!-- Leaderboard -->
