@@ -738,16 +738,18 @@
                 nickname: d.data().nickname || '',
                 ouroboros: !!d.data().ouroboros,
                 jormungandr: !!d.data().jormungandr,
+                basilisk: !!d.data().basilisk,
             }));
         };
 
-        window.submitGlobalScore = async function submitGlobalScore(difficulty, score, nickname, ouroboros, jormungandr) {
+        window.submitGlobalScore = async function submitGlobalScore(difficulty, score, nickname, ouroboros, jormungandr, basilisk) {
             await addDoc(collection(db, 'snakeScores'), {
                 difficulty,
                 score,
                 nickname: nickname || '',
                 ouroboros: !!ouroboros,
                 jormungandr: !!jormungandr,
+                basilisk: !!basilisk,
                 createdAt: serverTimestamp(),
             });
         };
@@ -923,18 +925,32 @@
         let needsRedraw = true;
         let lastUpdateTime = 0
 
-        // Ouroboros and Jörmungandr easter eggs - each fires once per game,
-        // independently of the other and in either order. Both pause the
-        // run the same way (see specialEvent* below and triggerOuroboros()/
-        // triggerJormungandr()), so they share one pause/overlay/rays
-        // system rather than duplicating it - only one can ever be waiting
-        // at a time, since reaching either fires from inside update(),
-        // which bails out early whenever a wait is already in progress.
+        // Ouroboros, Jörmungandr and the Basilisk - three easter eggs, each
+        // firing once per game, but no longer independent of each other:
+        // Ouroboros is the gate. Without it, this is just Snake - reaching
+        // JORMUNGANDR_LENGTH does nothing, and the Basilisk never appears.
+        // Once Ouroboros fires, Jörmungandr becomes reachable (any time
+        // after, via any growth - food or regrow) and the Basilisk spawns
+        // immediately (see spawnBasilisk() below). All three pause the run
+        // the same way (see specialEvent* below and triggerOuroboros()/
+        // triggerJormungandr()/triggerBasiliskSurvived()), so they share
+        // one pause/overlay/rays system rather than duplicating it - only
+        // one can ever be waiting at a time, since reaching any of them
+        // fires from inside update(), which bails out early whenever a
+        // wait is already in progress.
         let ouroborosTriggered = false;
         let jormungandrTriggered = false;
         // TEMPORARY for testing the "free life" rework - reinstate 80
         // (20% of the 20x20 board) once confirmed working.
         const JORMUNGANDR_LENGTH = 15;
+
+        // Basilisk easter egg - see spawnBasilisk()/triggerBasiliskSurvived()
+        // below for the full mechanism.
+        const BASILISK_FOOD_COUNT = 15;
+        let basiliskTriggered = false;
+        let basiliskActive = false;
+        let basiliskWall = [];
+        let basiliskFoodCounter = 0;
 
         // Ouroboros no longer shrinks the snake permanently - it collapses
         // to a single tile at the point of the bite, banks a free life
@@ -956,12 +972,12 @@
         let respawnMessageShowing = false;
 
         // Which snake color to draw - sticks after whichever fired most
-        // recently (if a game gets both, the later one's color wins).
-        let snakeColorMode = 'normal'; // 'normal' | 'ouroboros' | 'jormungandr'
+        // recently (if a game gets more than one, the latest wins).
+        let snakeColorMode = 'normal'; // 'normal' | 'ouroboros' | 'jormungandr' | 'basilisk'
 
         // The shared pause: 'kind' says which event is currently waiting,
         // so the overlay text/bonus and the rays' color know what to show.
-        let specialEventKind = null; // 'ouroboros' | 'jormungandr' | null
+        let specialEventKind = null; // 'ouroboros' | 'jormungandr' | 'basilisk' | null
         let specialEventWaiting = false;
         let specialEventOverlayDismissed = false;
         let specialEventLastTap = 0;
@@ -1063,7 +1079,7 @@
 
         async function submitScoreWithNickname(finalScore, nickname) {
             try {
-                await submitGlobalScore(difficultySelect.value, finalScore, nickname, ouroborosTriggered, jormungandrTriggered);
+                await submitGlobalScore(difficultySelect.value, finalScore, nickname, ouroborosTriggered, jormungandrTriggered, basiliskTriggered);
             } catch (e) {
                 console.warn('Could not submit score to the global leaderboard:', e);
             }
@@ -1081,7 +1097,7 @@
             topScoresElement.innerHTML = '';
             displayEntries.forEach((entry, index) => {
                 const line = document.createElement('div');
-                const badge = (entry.ouroboros ? ' ♾️' : '') + (entry.jormungandr ? ' \u{1F409}' : '');
+                const badge = (entry.ouroboros ? ' ♾️' : '') + (entry.jormungandr ? ' \u{1F409}' : '') + (entry.basilisk ? ' \u{1F5FF}' : '');
                 line.textContent = entry.nickname
                     ? `${index + 1}. ${entry.score} - ${entry.nickname}${badge}`
                     : `${index + 1}. ${entry.score}${badge}`;
@@ -1133,11 +1149,14 @@
                 
                 // Check collision with SNAKE
                 const collidesWithSnake = snake.some(segment => segment.x === food.x && segment.y === food.y);
-                
+
                 // Check collision with BAD FOOD
                 const collidesWithBadFood = badFoodList.some(badFood => badFood.x === food.x && badFood.y === food.y);
 
-                validPosition = !collidesWithSnake && !collidesWithBadFood;
+                // Check collision with the Basilisk's gaze wall, if up
+                const collidesWithBasiliskWall = basiliskActive && basiliskWall.some(seg => seg.x === food.x && seg.y === food.y);
+
+                validPosition = !collidesWithSnake && !collidesWithBadFood && !collidesWithBasiliskWall;
             }
         }
 
@@ -1169,7 +1188,10 @@
                     // Check collision with BAD FOOD
                     const badFoodCollision = badFoodList.some(badFood => badFood.x === newBadFood.x && badFood.y === newBadFood.y);
 
-                    validPosition = !snakeCollision && !badFoodCollision && !regularFoodCollision && !tooCloseToHead;
+                    // Check collision with the Basilisk's gaze wall, if up
+                    const basiliskWallCollision = basiliskActive && basiliskWall.some(seg => seg.x === newBadFood.x && seg.y === newBadFood.y);
+
+                    validPosition = !snakeCollision && !badFoodCollision && !regularFoodCollision && !tooCloseToHead && !basiliskWallCollision;
                 }
                 
                 if (validPosition) {
@@ -1240,12 +1262,13 @@
 
         // Rays shining out from the canvas center, drawn while a special
         // event's overlay waits for the next move - gold for Ouroboros,
-        // teal for Jörmungandr. A slow rotation (driven by the clock, not
-        // the game's own tick rate, so it stays smooth regardless of
-        // difficulty) keeps it feeling alive.
+        // teal for Jörmungandr, stone gray for the Basilisk. A slow
+        // rotation (driven by the clock, not the game's own tick rate, so
+        // it stays smooth regardless of difficulty) keeps it feeling alive.
         const SUNBURST_RGB = {
             ouroboros: '255, 215, 0',
             jormungandr: '0, 105, 105', // dark teal
+            basilisk: '110, 110, 102', // stone gray
         };
 
         function drawSpecialRays(kind) {
@@ -1294,6 +1317,20 @@
                 drawSpecialRays(specialEventKind);
             }
 
+            // Basilisk's gaze wall - drawn as stone blocks, under the
+            // food/snake layers below.
+            if (basiliskActive) {
+                for (const seg of basiliskWall) {
+                    const px = seg.x * gridSize;
+                    const py = seg.y * gridSize;
+                    ctx.fillStyle = '#6E6E66';  // Stone gray
+                    ctx.fillRect(px, py, gridSize, gridSize);
+                    ctx.strokeStyle = '#4A4A42';  // Mortar lines between blocks
+                    ctx.lineWidth = 1;
+                    ctx.strokeRect(px + 0.5, py + 0.5, gridSize - 1, gridSize - 1);
+                }
+            }
+
             // Draw food with stem
             ctx.fillStyle = '#ff0000';  // Red apple outline
             ctx.fillRect(food.x * gridSize + 2, food.y * gridSize + 4, gridSize - 4, gridSize - 6);
@@ -1330,12 +1367,14 @@
             }
             
             // Normal green body/head, unless a special event has fired -
-            // gold for Ouroboros, teal for Jörmungandr (whichever fired
-            // most recently, if a run gets both).
+            // gold for Ouroboros, teal for Jörmungandr, stone gray for the
+            // Basilisk (whichever fired most recently, if a run gets more
+            // than one).
             const SNAKE_COLORS = {
                 normal: { body: '#ADDDBB', head: '#32A956' },
                 ouroboros: { body: '#FFD700', head: '#DAA520' },
                 jormungandr: { body: '#20B2AA', head: '#006666' },
+                basilisk: { body: '#8B8B83', head: '#5A5A52' },
             };
             const snakeColors = SNAKE_COLORS[snakeColorMode];
 
@@ -1393,10 +1432,18 @@
             if (nextDx === 0 && nextDy === 0) return;
 
             // A direction just arrived after the overlay was dismissed -
-            // resume normally from here on.
+            // resume normally from here on. If it was Ouroboros's overlay,
+            // this is also the moment the Basilisk spawns (see
+            // spawnBasilisk() below) - it's the gate everything else waits
+            // behind, so it only ever needs to check for itself here, not
+            // Jörmungandr's or its own overlay resuming.
             if (specialEventWaiting) {
+                const resumedKind = specialEventKind;
                 specialEventWaiting = false;
                 specialEventKind = null;
+                if (resumedKind === 'ouroboros' && !basiliskTriggered && !basiliskActive) {
+                    spawnBasilisk(-nextDx, -nextDy);
+                }
             }
 
             if (respawnMessageShowing) {
@@ -1410,6 +1457,17 @@
             if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
                 handleDeath('wall');
                 return;
+            }
+
+            // Check the Basilisk's gaze wall, if one is currently up -
+            // same treatment as the board's own edge.
+            if (basiliskActive) {
+                for (const seg of basiliskWall) {
+                    if (head.x === seg.x && head.y === seg.y) {
+                        handleDeath('wall');
+                        return;
+                    }
+                }
             }
 
             // Check self collision - Ouroboros only fires for the true
@@ -1457,6 +1515,12 @@
 
                 gameSpeed = getGameSpeed(pacingScore);
 
+                // Counts toward outlasting the Basilisk's gaze wall, if
+                // one is currently up - see triggerBasiliskSurvived() below.
+                if (basiliskActive) {
+                    basiliskFoodCounter++;
+                }
+
                 randomFood();
                 randomBadFood();
 
@@ -1469,12 +1533,23 @@
                 snake.pop();
             }
 
-            // Jörmungandr: growing long enough is its own easter egg,
-            // independent of Ouroboros and in either order, and whether
-            // the growth just came from food or from regrowing after an
-            // Ouroboros collapse - see triggerJormungandr() below.
-            if (!jormungandrTriggered && snake.length >= JORMUNGANDR_LENGTH) {
+            // Jörmungandr: growing long enough is its own easter egg, but
+            // only reachable once Ouroboros has already fired this run
+            // (see the state comments above) - whether the growth just
+            // came from food or from regrowing after an Ouroboros
+            // collapse - see triggerJormungandr() below.
+            if (ouroborosTriggered && !jormungandrTriggered && snake.length >= JORMUNGANDR_LENGTH) {
                 triggerJormungandr();
+            }
+
+            // Basilisk: surviving until BASILISK_FOOD_COUNT apples have
+            // been eaten since it spawned is the achievement - the wall
+            // itself doesn't reward anything, only outlasting it does. The
+            // !specialEventWaiting guard defers this a tick in the rare
+            // case Jörmungandr's check just above fired on this exact
+            // move, so the two overlays can't stomp on each other.
+            if (!specialEventWaiting && basiliskActive && basiliskFoodCounter >= BASILISK_FOOD_COUNT) {
+                triggerBasiliskSurvived();
             }
         }
 
@@ -1556,9 +1631,11 @@
         }
 
         // Jörmungandr easter egg: growing the snake to JORMUNGANDR_LENGTH
-        // segments - independent of Ouroboros, in either order, and also
-        // once per game. Same shrink-and-pause treatment, its own color
-        // and bonus.
+        // segments - but only reachable once Ouroboros has already fired
+        // this run (see the gating comment on ouroborosTriggered above).
+        // Once unlocked it can fire any time after, via any growth - food
+        // or regrow - and also only once per game. Same shrink-and-pause
+        // treatment, its own color and bonus.
         function triggerJormungandr() {
             const headPos = snake[0];
             snake = [{x: headPos.x, y: headPos.y}];
@@ -1573,6 +1650,51 @@
             scoreElement.textContent = score;
 
             beginSpecialEvent('jormungandr', 'Jörmungandr Found!', '+1000');
+        }
+
+        // Basilisk easter egg: can only appear after Ouroboros has already
+        // fired (see the specialEventWaiting-resume branch in update(),
+        // which calls this) - spawns at the board's center the moment play
+        // resumes after Ouroboros's own pause, with its gaze projecting a
+        // wall of blocked tiles from there to the board edge in the
+        // direction behind the snake's newly-resumed heading (closing off
+        // the retreat, not the path ahead). Touching any tile of it,
+        // including the origin, is a death like any wall (see the
+        // basiliskActive check in update()).
+        function spawnBasilisk(awayX, awayY) {
+            const centerX = Math.floor(tileCount / 2);
+            const centerY = Math.floor(tileCount / 2);
+            const wall = [{x: centerX, y: centerY}];
+            let x = centerX, y = centerY;
+            while (x + awayX >= 0 && x + awayX < tileCount && y + awayY >= 0 && y + awayY < tileCount) {
+                x += awayX;
+                y += awayY;
+                wall.push({x, y});
+            }
+            basiliskWall = wall;
+            basiliskActive = true;
+            basiliskFoodCounter = 0;
+
+            // The wall may now be sitting under the current food/bad food -
+            // re-roll both so neither spawns on (or stays on) it.
+            randomFood();
+            randomBadFood();
+        }
+
+        // The wall persisting isn't itself the achievement - surviving
+        // until BASILISK_FOOD_COUNT apples have been eaten since it
+        // spawned (not raw moves - circling in place forever would
+        // otherwise clear it for free) is. Checked in update() above.
+        function triggerBasiliskSurvived() {
+            basiliskActive = false;
+            basiliskWall = [];
+            basiliskTriggered = true;
+            snakeColorMode = 'basilisk';
+
+            score += 1500;
+            scoreElement.textContent = score;
+
+            beginSpecialEvent('basilisk', 'Basilisk Outlasted!', '+1500');
         }
 
         function beginSpecialEvent(kind, title, bonus) {
@@ -1662,6 +1784,10 @@
             jormungandrTriggered = false;
             ouroborosLifeAvailable = false;
             regrowPending = 0;
+            basiliskTriggered = false;
+            basiliskActive = false;
+            basiliskWall = [];
+            basiliskFoodCounter = 0;
             updateExtraLifeIndicator();
             snakeColorMode = 'normal';
             specialEventKind = null;

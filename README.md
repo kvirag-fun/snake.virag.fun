@@ -30,9 +30,12 @@ installable as a PWA. Live at
 
 ## Fairytales
 
-Two hidden, mythology-themed easter eggs - both fire once per run,
-independently of each other, in either order, and a single run can
-earn both.
+Three hidden, mythology-themed easter eggs, each firing once per run.
+Ouroboros is the gate: until it fires, this is just Snake - Jörmungandr
+and the Basilisk are both unreachable. Once Ouroboros fires, the other
+two become available (the Basilisk immediately, Jörmungandr any time
+after via growth) and are independent of each other, in either order -
+a single run can earn all three.
 
 - **Ouroboros**: biting your own tail tip (not any other self-collision)
   the first time in a run doesn't kill you - the snake collapses to a
@@ -59,17 +62,30 @@ earn both.
   is already spent, is a normal death. Leaderboard entries that
   triggered it get a ♾️ badge next to the score.
 - **Jörmungandr**: growing the snake to 80 segments (`JORMUNGANDR_LENGTH`
-  in `index.html`) triggers independently of Ouroboros - either can happen
-  first, neither requires the other, both can happen in the same run
-  (and Ouroboros's free life, if still banked, carries through Jörmungandr
-  triggering unaffected - only Ouroboros's own regrow-to-old-length
-  target is cancelled if Jörmungandr fires while a regrow is still in
-  progress, since its own shrink-to-1 wins). Unlike Ouroboros, this one
-  does shrink to 1 square and stays there - no regrow - pause/rays/color
-  otherwise the same treatment, just teal instead of gold and +1000
-  instead of +500. A run with both fires shows both badges (♾️🐉).
-  Whichever of the two events fires later wins the
-  snake's color for the rest of the run.
+  in `index.html`) triggers it - but only once Ouroboros has already
+  fired this run (Ouroboros's free life, if still banked, carries
+  through unaffected - only its own regrow-to-old-length target is
+  cancelled if Jörmungandr fires mid-regrow, since its own shrink-to-1
+  wins). Unlike Ouroboros, this one does shrink to 1 square and stays
+  there - no regrow - pause/rays/color otherwise the same treatment,
+  just teal instead of gold and +1000 instead of +500. Leaderboard
+  entries get a 🐉 badge.
+- **Basilisk**: appears the instant you swipe to resume after
+  Ouroboros's own pause - its gaze projects a wall of stone-gray tiles
+  from the board's center out to the edge, in the direction *behind*
+  your newly-resumed heading (closing off your retreat, not blocking
+  the path ahead - see `spawnBasilisk()`). Touching any tile of it,
+  including the center origin, is a death like any wall (a banked
+  Ouroboros life still forgives it, same as any other death). The wall
+  stays up until 15 apples have been eaten since it spawned
+  (`BASILISK_FOOD_COUNT`) - not 15 raw moves, so circling in place can't
+  clear it for free, you have to actually keep playing. Surviving to
+  see it clear is the achievement: same pause/rays treatment, +1500,
+  stone gray, 🗿 badge. Only ever spawns once per run.
+
+Whichever of the three fired most recently wins the snake's color for
+the rest of the run, and a run that earns more than one shows all of
+their badges together next to the score.
 
 ## Running locally
 
