@@ -118,16 +118,9 @@
 
         /* Always visible - hollow/muted when no life is banked (like an
            empty container waiting to be filled), solid and colored once
-           Ouroboros banks one. A count badge can overlay the glyph itself
-           (see .extra-life-count) so a future second life source doesn't
-           need a second heart competing for space in this header - only
-           one glyph, ever, just with a number in it once there's more
-           than one banked. */
+           Ouroboros banks one. A second heart slot (see .extra-life-slot)
+           sits next to this one for a future second life source. */
         .extra-life {
-            position: relative;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
             font-size: 42px;
             line-height: 1;
             color: var(--muted-foreground);
@@ -139,19 +132,14 @@
             opacity: 1;
         }
 
-        /* Sits in the heart's lower "belly", where the glyph has the most
-           fill to read against - hidden entirely while the count is 0 or
-           1, since the heart shape alone already says that. */
-        .extra-life-count {
-            position: absolute;
-            top: 54%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-family: var(--font-mono);
-            font-size: 18px;
-            font-weight: 700;
-            color: #000;
-            pointer-events: none;
+        /* A second, always-hollow heart slot - not wired to any mechanic
+           yet, just reserving its place in the header now so adding a
+           second life source later doesn't need a layout change. */
+        .extra-life-slot {
+            font-size: 42px;
+            line-height: 1;
+            color: var(--muted-foreground);
+            opacity: 0.5;
         }
 
         main.layout {
@@ -605,10 +593,8 @@
         <div class="hud">
             <span>Level <strong id="level">1</strong></span>
             <span>Score <strong id="score">0</strong></span>
-            <span id="extraLifeIndicator" class="extra-life" title="No free life banked yet - biting your own tail tip earns one">
-                <span id="extraLifeGlyph">&#9825;</span>
-                <span id="extraLifeCount" class="extra-life-count"></span>
-            </span>
+            <span id="extraLifeIndicator" class="extra-life" title="No free life banked yet - biting your own tail tip earns one">&#9825;</span>
+            <span class="extra-life-slot" title="Reserved for a future second free life" aria-hidden="true">&#9825;</span>
         </div>
         <button type="button" id="infoButton" class="info-button" aria-label="Controls and rules" aria-haspopup="dialog">i</button>
     </header>
@@ -802,8 +788,6 @@
         const specialOverlayTitleElement = document.getElementById('specialOverlayTitle');
         const specialOverlayBonusElement = document.getElementById('specialOverlayBonus');
         const extraLifeIndicatorElement = document.getElementById('extraLifeIndicator');
-        const extraLifeGlyphElement = document.getElementById('extraLifeGlyph');
-        const extraLifeCountElement = document.getElementById('extraLifeCount');
         const respawnMessageElement = document.getElementById('respawnMessage');
         const soundToggle = document.getElementById('soundToggle');
         const difficultySelect = document.getElementById('difficultySelect');
@@ -1691,16 +1675,9 @@
         }
 
         function updateExtraLifeIndicator() {
-            // Only one life source exists today, so this is always 0 or 1 -
-            // the count badge is future-proofing: a later second life
-            // source can bump this without needing a second heart icon
-            // (see .extra-life above), it'll just show a number in this
-            // same glyph instead.
-            const livesBanked = ouroborosLifeAvailable ? 1 : 0;
-            extraLifeIndicatorElement.classList.toggle('extra-life--filled', livesBanked > 0);
-            extraLifeGlyphElement.textContent = livesBanked > 0 ? '♥' : '♡';
-            extraLifeCountElement.textContent = livesBanked > 1 ? livesBanked : '';
-            extraLifeIndicatorElement.title = livesBanked > 0
+            extraLifeIndicatorElement.classList.toggle('extra-life--filled', ouroborosLifeAvailable);
+            extraLifeIndicatorElement.textContent = ouroborosLifeAvailable ? '♥' : '♡';
+            extraLifeIndicatorElement.title = ouroborosLifeAvailable
                 ? 'Free life banked - your next death respawns you instead of ending the run'
                 : 'No free life banked yet - biting your own tail tip earns one';
         }
