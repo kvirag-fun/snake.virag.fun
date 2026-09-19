@@ -119,13 +119,119 @@
             align-items: center;
         }
 
-        h1.title {
-            align-self: flex-start;
+        .title-row {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
             margin: 0 0 1rem;
+        }
+
+        h1.title {
+            margin: 0;
             font-family: var(--font-display);
             font-size: 2rem;
             font-weight: 600;
             color: var(--foreground);
+        }
+
+        .info-button {
+            flex-shrink: 0;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+            background: var(--card);
+            color: var(--primary);
+            font-family: var(--font-mono);
+            font-size: 14px;
+            font-style: italic;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .info-button:hover {
+            border-color: var(--primary);
+        }
+
+        .info-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+            background: oklch(0.2 0.02 255 / 0.55);
+        }
+
+        .info-overlay[hidden] {
+            display: none;
+        }
+
+        .info-panel {
+            width: 100%;
+            max-width: 420px;
+            max-height: 85vh;
+            overflow-y: auto;
+            padding: 16px 18px;
+            background: var(--card);
+            font-family: var(--font-sans);
+            color: var(--foreground);
+        }
+
+        .info-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .info-panel-header h2 {
+            margin: 0;
+            font-family: var(--font-display);
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .info-close {
+            flex-shrink: 0;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+            background: var(--card);
+            color: var(--muted-foreground);
+            font-size: 18px;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        .info-close:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .info-list {
+            margin: 0 0 14px;
+            padding-left: 0;
+            list-style: none;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        .info-list:last-child {
+            margin-bottom: 0;
+        }
+
+        .info-list li {
+            padding-left: 1.1em;
+            text-indent: -1.1em;
+        }
+
+        .info-list li::before {
+            content: "\2014 ";
+            color: var(--markup);
         }
 
         .canvas-frame {
@@ -328,7 +434,10 @@
     </header>
 
     <main class="layout">
-        <h1 class="title">Snake</h1>
+        <div class="title-row">
+            <h1 class="title">Snake</h1>
+            <button type="button" id="infoButton" class="info-button" aria-label="Controls and rules" aria-haspopup="dialog">i</button>
+        </div>
 
         <!-- Flexbox side-by-side -->
         <div class="flex-container" style="width: 100%; margin: 0 0 12px; display: flex; gap: 12px; align-items: stretch">
@@ -370,6 +479,30 @@
             </div>
         </div>
     </main>
+
+    <div id="infoOverlay" class="info-overlay" hidden>
+        <div class="info-panel corner-ticks" role="dialog" aria-modal="true" aria-labelledby="infoTitle">
+            <div class="info-panel-header">
+                <h2 id="infoTitle">Controls &amp; Rules</h2>
+                <button type="button" id="infoCloseButton" class="info-close" aria-label="Close">&times;</button>
+            </div>
+
+            <div class="panel-title">Controls</div>
+            <ul class="info-list">
+                <li>Arrow keys or swipe to steer.</li>
+                <li>A swipe can start anywhere on the page, not just on the canvas.</li>
+                <li>Double-tap the canvas or press <strong>R</strong> to restart after a game over.</li>
+            </ul>
+
+            <div class="panel-title">Rules</div>
+            <ul class="info-list">
+                <li>Eat the food to grow and score points.</li>
+                <li>Running into a wall, yourself, or a rotten (bad) food tile ends the run.</li>
+                <li>Four difficulty levels change how fast the snake moves - Viper is slowest, King Cobra fastest.</li>
+                <li>Each difficulty has its own global top-5 leaderboard, shared by everyone who plays.</li>
+            </ul>
+        </div>
+    </div>
 
     <!-- Global (cross-device) leaderboard, backed by Firestore. Kept as
          its own module script (ES module imports need type="module") and
@@ -465,7 +598,32 @@
                 displayLeaderboard();
             }
         });
-        
+
+        // Controls & rules overlay
+        const infoButton = document.getElementById('infoButton');
+        const infoOverlay = document.getElementById('infoOverlay');
+        const infoCloseButton = document.getElementById('infoCloseButton');
+
+        function openInfoOverlay() {
+            infoOverlay.hidden = false;
+        }
+
+        function closeInfoOverlay() {
+            infoOverlay.hidden = true;
+        }
+
+        infoButton.addEventListener('click', openInfoOverlay);
+        infoCloseButton.addEventListener('click', closeInfoOverlay);
+
+        // Click on the backdrop (not the panel itself) closes it too.
+        infoOverlay.addEventListener('click', (e) => {
+            if (e.target === infoOverlay) closeInfoOverlay();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !infoOverlay.hidden) closeInfoOverlay();
+        });
+
         // Game settings
         const gridSize = 20;
         const tileCount = canvas.width / gridSize;
@@ -953,7 +1111,7 @@
         const minSwipeDistance = 20;
 
         function isFormControl(target) {
-            return target.closest('select, input, label') !== null;
+            return target.closest('select, input, label, #infoOverlay, #infoButton') !== null;
         }
 
         document.addEventListener('touchstart', (e) => {
