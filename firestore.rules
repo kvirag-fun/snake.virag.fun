@@ -9,13 +9,14 @@ service cloud.firestore {
       allow read: if true;
 
       allow create:
-        if request.resource.data.keys().hasOnly(['difficulty', 'score', 'nickname', 'ouroboros', 'createdAt'])
+        if request.resource.data.keys().hasOnly(['difficulty', 'score', 'nickname', 'ouroboros', 'jormungandr', 'createdAt'])
         && request.resource.data.difficulty in ['0.00', '0.25', '0.50', '1.00']
         && request.resource.data.score is int
         && request.resource.data.score >= 0
         // 20x20 board, +10 per food - max possible run is well under 4000,
-        // plus the one-time +500 Ouroboros bonus (see index.html).
-        && request.resource.data.score <= 5000
+        // plus the one-time +500 Ouroboros and +1000 Jörmungandr bonuses
+        // (see index.html), which a single run can get both of.
+        && request.resource.data.score <= 6000
         // Optional nickname, entered client-side when a run actually
         // qualifies for the top 5. This is a charset/length guard only -
         // profanity filtering happens client-side (see index.html) since
@@ -24,9 +25,10 @@ service cloud.firestore {
         && request.resource.data.nickname is string
         && request.resource.data.nickname.size() <= 15
         && request.resource.data.nickname.matches('^[A-Za-z0-9 _.-]*$')
-        // Whether this run triggered the Ouroboros easter egg (index.html)
-        // - shown as a small badge next to the nickname on the board.
+        // Whether this run triggered the Ouroboros/Jörmungandr easter eggs
+        // (index.html) - each shown as a small badge next to the score.
         && request.resource.data.ouroboros is bool
+        && request.resource.data.jormungandr is bool
         && request.resource.data.createdAt == request.time;
 
       allow update, delete: if false;

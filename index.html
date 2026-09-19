@@ -404,10 +404,13 @@
             bottom: 20px;
         }
 
-        /* Shown centered over the canvas while the Ouroboros cycle waits
-           for the next move - same overlay recipe as .game-over-overlay,
-           gold instead of the usual markup color. */
-        .ouroboros-overlay {
+        /* Shown centered over the canvas while an Ouroboros/Jörmungandr
+           pause waits for the next move - same overlay recipe as
+           .game-over-overlay. Shared by both events (see specialEventKind)
+           - only the title/bonus text and the rays' color (drawn on the
+           canvas, not here) differ between them, so the crimson text color
+           stays constant rather than needing a per-event variant. */
+        .special-overlay {
             position: absolute;
             top: 50%;
             left: 10px;
@@ -422,12 +425,12 @@
             pointer-events: none;
         }
 
-        .ouroboros-overlay .ouroboros-title {
+        .special-overlay .special-title {
             font-size: 16px;
             font-weight: 600;
         }
 
-        .ouroboros-overlay .ouroboros-bonus {
+        .special-overlay .special-bonus {
             /* Same weight/size/spacing as the HUD's score value (.hud
                strong) - it is one, just delivered as a lump sum. */
             font-weight: 700;
@@ -436,7 +439,7 @@
             margin-top: 4px;
         }
 
-        .ouroboros-overlay .ouroboros-continue-hint {
+        .special-overlay .special-continue-hint {
             font-size: 11px;
             margin-top: 10px;
             opacity: 0.85;
@@ -579,10 +582,10 @@
             <canvas id="gameCanvas" width="400" height="400"></canvas>
             <div id="gameOverTop" class="game-over-overlay game-over-top" hidden></div>
             <div id="gameOverBottom" class="game-over-overlay game-over-bottom">Double-tap or press R to restart.</div>
-            <div id="ouroborosOverlay" class="ouroboros-overlay" hidden>
-                <div class="ouroboros-title">Ouroboros Unlocked!</div>
-                <div class="ouroboros-bonus">+500</div>
-                <div class="ouroboros-continue-hint">Double-tap or press R to continue.</div>
+            <div id="specialOverlay" class="special-overlay" hidden>
+                <div class="special-title" id="specialOverlayTitle"></div>
+                <div class="special-bonus" id="specialOverlayBonus"></div>
+                <div class="special-continue-hint">Double-tap or press R to continue.</div>
             </div>
         </div>
     </main>
@@ -609,6 +612,7 @@
                 <li>Each difficulty has its own global top-5 leaderboard, shared by everyone who plays.</li>
                 <li>Make the top 5 and you can add an optional nickname.</li>
                 <li>Some say a snake that bites its own tail doesn't die.</li>
+                <li>Legends also speak of a serpent that grows long enough to encircle the world.</li>
             </ul>
         </div>
     </div>
@@ -693,15 +697,17 @@
                 score: d.data().score,
                 nickname: d.data().nickname || '',
                 ouroboros: !!d.data().ouroboros,
+                jormungandr: !!d.data().jormungandr,
             }));
         };
 
-        window.submitGlobalScore = async function submitGlobalScore(difficulty, score, nickname, ouroboros) {
+        window.submitGlobalScore = async function submitGlobalScore(difficulty, score, nickname, ouroboros, jormungandr) {
             await addDoc(collection(db, 'snakeScores'), {
                 difficulty,
                 score,
                 nickname: nickname || '',
                 ouroboros: !!ouroboros,
+                jormungandr: !!jormungandr,
                 createdAt: serverTimestamp(),
             });
         };
@@ -719,7 +725,9 @@
         const levelElement = document.getElementById('level');
         const gameOverTopElement = document.getElementById('gameOverTop');
         const gameOverBottomElement = document.getElementById('gameOverBottom');
-        const ouroborosOverlayElement = document.getElementById('ouroborosOverlay');
+        const specialOverlayElement = document.getElementById('specialOverlay');
+        const specialOverlayTitleElement = document.getElementById('specialOverlayTitle');
+        const specialOverlayBonusElement = document.getElementById('specialOverlayBonus');
         const soundToggle = document.getElementById('soundToggle');
         const difficultySelect = document.getElementById('difficultySelect');
 
@@ -873,13 +881,27 @@
         let needsRedraw = true;
         let lastUpdateTime = 0
 
-        // Ouroboros easter egg - biting your own tail doesn't end the run
-        // the first time it happens per game. See triggerOuroboros() below.
+        // Ouroboros and Jörmungandr easter eggs - each fires once per game,
+        // independently of the other and in either order. Both pause the
+        // run the same way (see specialEvent* below and triggerOuroboros()/
+        // triggerJormungandr()), so they share one pause/overlay/rays
+        // system rather than duplicating it - only one can ever be waiting
+        // at a time, since reaching either fires from inside update(),
+        // which bails out early whenever a wait is already in progress.
         let ouroborosTriggered = false;
-        let ouroborosWaiting = false;
-        let ouroborosOverlayDismissed = false;
-        let ouroborosLastTap = 0;
-        let snakeGolden = false;
+        let jormungandrTriggered = false;
+        const JORMUNGANDR_LENGTH = 80;
+
+        // Which snake color to draw - sticks after whichever fired most
+        // recently (if a game gets both, the later one's color wins).
+        let snakeColorMode = 'normal'; // 'normal' | 'ouroboros' | 'jormungandr'
+
+        // The shared pause: 'kind' says which event is currently waiting,
+        // so the overlay text/bonus and the rays' color know what to show.
+        let specialEventKind = null; // 'ouroboros' | 'jormungandr' | null
+        let specialEventWaiting = false;
+        let specialEventOverlayDismissed = false;
+        let specialEventLastTap = 0;
 
         //Handle splash screen image
         const splashImage = new Image();
@@ -978,7 +1000,7 @@
 
         async function submitScoreWithNickname(finalScore, nickname) {
             try {
-                await submitGlobalScore(difficultySelect.value, finalScore, nickname, ouroborosTriggered);
+                await submitGlobalScore(difficultySelect.value, finalScore, nickname, ouroborosTriggered, jormungandrTriggered);
             } catch (e) {
                 console.warn('Could not submit score to the global leaderboard:', e);
             }
@@ -996,7 +1018,7 @@
             topScoresElement.innerHTML = '';
             displayEntries.forEach((entry, index) => {
                 const line = document.createElement('div');
-                const badge = entry.ouroboros ? ' ♾️' : '';
+                const badge = (entry.ouroboros ? ' ♾️' : '') + (entry.jormungandr ? ' \u{1F409}' : '');
                 line.textContent = entry.nickname
                     ? `${index + 1}. ${entry.score} - ${entry.nickname}${badge}`
                     : `${index + 1}. ${entry.score}${badge}`;
@@ -1113,15 +1135,15 @@
         }
 
         // The sunburst's shape and gradients never change frame to frame -
-        // only its rotation does - so it's rendered once to an offscreen
-        // canvas and just rotated + stamped down each frame after that.
-        // Rebuilding 12 gradients and paths every single frame (the
-        // previous approach) was expensive enough on its own to be a
-        // likely source of the dropped-frame jumpiness, independent of
-        // how often drawGame() itself gets called.
-        let ouroborosSunburst = null;
+        // only its rotation does - so each color variant is rendered once
+        // to an offscreen canvas (cached by color) and just rotated +
+        // stamped down each frame after that. Rebuilding 12 gradients and
+        // paths every single frame (the original approach) was expensive
+        // enough on its own to be a likely source of dropped-frame
+        // jumpiness, independent of how often drawGame() itself gets called.
+        const sunburstCache = {};
 
-        function buildOuroborosSunburst() {
+        function buildSunburst(rgb) {
             const rayCount = 12;
             const cx = canvas.width / 2;
             const cy = canvas.height / 2;
@@ -1138,8 +1160,8 @@
                 octx.save();
                 octx.rotate((i / rayCount) * Math.PI * 2);
                 const gradient = octx.createLinearGradient(0, 0, rayLength, 0);
-                gradient.addColorStop(0, 'rgba(255, 215, 0, 0.85)');
-                gradient.addColorStop(1, 'rgba(255, 215, 0, 0)');
+                gradient.addColorStop(0, `rgba(${rgb}, 0.85)`);
+                gradient.addColorStop(1, `rgba(${rgb}, 0)`);
                 octx.fillStyle = gradient;
                 octx.beginPath();
                 octx.moveTo(0, -6);
@@ -1153,14 +1175,21 @@
             return off;
         }
 
-        // Golden rays shining out from the canvas center, drawn while the
-        // Ouroboros overlay waits for the next move. A slow rotation
-        // (driven by the clock, not the game's own tick rate, so it stays
-        // smooth regardless of difficulty) keeps it feeling alive.
-        function drawOuroborosRays() {
-            if (!ouroborosSunburst) {
-                ouroborosSunburst = buildOuroborosSunburst();
+        // Rays shining out from the canvas center, drawn while a special
+        // event's overlay waits for the next move - gold for Ouroboros,
+        // teal for Jörmungandr. A slow rotation (driven by the clock, not
+        // the game's own tick rate, so it stays smooth regardless of
+        // difficulty) keeps it feeling alive.
+        const SUNBURST_RGB = {
+            ouroboros: '255, 215, 0',
+            jormungandr: '0, 105, 105', // dark teal
+        };
+
+        function drawSpecialRays(kind) {
+            if (!sunburstCache[kind]) {
+                sunburstCache[kind] = buildSunburst(SUNBURST_RGB[kind]);
             }
+            const sunburst = sunburstCache[kind];
 
             const cx = canvas.width / 2;
             const cy = canvas.height / 2;
@@ -1169,7 +1198,7 @@
             ctx.save();
             ctx.translate(cx, cy);
             ctx.rotate(rotation);
-            ctx.drawImage(ouroborosSunburst, -ouroborosSunburst.width / 2, -ouroborosSunburst.height / 2);
+            ctx.drawImage(sunburst, -sunburst.width / 2, -sunburst.height / 2);
             ctx.restore();
         }
 
@@ -1198,8 +1227,8 @@
             // The rays are part of the "not yet dismissed" phase, same as
             // the text overlay - both should disappear together on the
             // double-tap, well before movement actually resumes.
-            if (ouroborosWaiting && !ouroborosOverlayDismissed) {
-                drawOuroborosRays();
+            if (specialEventWaiting && !specialEventOverlayDismissed) {
+                drawSpecialRays(specialEventKind);
             }
 
             // Draw food with stem
@@ -1237,18 +1266,26 @@
                 ctx.fillRect(px + 13, py + 1, 3, 2);
             }
             
-            // Normal green for body - gold after Ouroboros has triggered
-            ctx.fillStyle = snakeGolden ? '#FFD700' : '#ADDDBB';
+            // Normal green body/head, unless a special event has fired -
+            // gold for Ouroboros, teal for Jörmungandr (whichever fired
+            // most recently, if a run gets both).
+            const SNAKE_COLORS = {
+                normal: { body: '#ADDDBB', head: '#32A956' },
+                ouroboros: { body: '#FFD700', head: '#DAA520' },
+                jormungandr: { body: '#20B2AA', head: '#006666' },
+            };
+            const snakeColors = SNAKE_COLORS[snakeColorMode];
+
+            ctx.fillStyle = snakeColors.body;
             for (let i = 1; i < snake.length; i++) {
                 ctx.fillRect(snake[i].x * gridSize, snake[i].y * gridSize, gridSize - 2, gridSize - 2);
             }
 
-            // Draw snake - darker head (darker gold once golden)
+            // Draw snake - darker head
             const headX = snake[0].x * gridSize
             const headY = snake[0].y * gridSize
             const headSize = gridSize - 2
-            const headColor = snakeGolden ? '#DAA520' : '#32A956';
-            ctx.fillStyle = snake.length > 0 ? headColor : (snakeGolden ? '#FFD700' : '#ADDDBB');
+            ctx.fillStyle = snake.length > 0 ? snakeColors.head : snakeColors.body;
             ctx.fillRect(headX, headY, headSize, headSize);
 
             // Draw two red eyes on head
@@ -1271,11 +1308,11 @@
         function update() {
             if (!gameRunning) return;
 
-            // The Ouroboros overlay needs a double-tap (or an arrow key -
+            // A special-event overlay needs a double-tap (or an arrow key -
             // see the keydown handler) to dismiss before any swipe/key
             // counts as a direction - discard anything that snuck into
             // the queue in the meantime so it can't become the first move.
-            if (ouroborosWaiting && !ouroborosOverlayDismissed) {
+            if (specialEventWaiting && !specialEventOverlayDismissed) {
                 inputQueue = [];
                 return;
             }
@@ -1294,8 +1331,9 @@
 
             // A direction just arrived after the overlay was dismissed -
             // resume normally from here on.
-            if (ouroborosWaiting) {
-                ouroborosWaiting = false;
+            if (specialEventWaiting) {
+                specialEventWaiting = false;
+                specialEventKind = null;
             }
 
             const head = {x: snake[0].x + nextDx, y: snake[0].y + nextDy};
@@ -1352,6 +1390,13 @@
                 randomFood();
                 randomBadFood();
 
+                // Jörmungandr: growing long enough is its own easter egg,
+                // independent of Ouroboros and in either order - see
+                // triggerJormungandr() below.
+                if (!jormungandrTriggered && snake.length >= JORMUNGANDR_LENGTH) {
+                    triggerJormungandr();
+                }
+
             } else {
                 snake.pop();
             }
@@ -1367,27 +1412,46 @@
         function triggerOuroboros(head) {
             snake = [{x: head.x, y: head.y}];
             ouroborosTriggered = true;
-            snakeGolden = true;
+            snakeColorMode = 'ouroboros';
 
             // Only score (shown/submitted) gets the bonus - pacingScore
             // is untouched, so level and game speed don't jump too.
             score += 500;
             scoreElement.textContent = score;
 
+            beginSpecialEvent('ouroboros', 'Ouroboros Unlocked!', '+500');
+        }
+
+        // Jörmungandr easter egg: growing the snake to JORMUNGANDR_LENGTH
+        // segments - independent of Ouroboros, in either order, and also
+        // once per game. Same shrink-and-pause treatment, its own color
+        // and bonus.
+        function triggerJormungandr() {
+            const headPos = snake[0];
+            snake = [{x: headPos.x, y: headPos.y}];
+            jormungandrTriggered = true;
+            snakeColorMode = 'jormungandr';
+
+            score += 1000;
+            scoreElement.textContent = score;
+
+            beginSpecialEvent('jormungandr', 'Jörmungandr Found!', '+1000');
+        }
+
+        function beginSpecialEvent(kind, title, bonus) {
             dx = 0;
             dy = 0;
             inputQueue = [];
-            ouroborosWaiting = true;
-            ouroborosOverlayDismissed = false;
-            showOuroborosOverlay();
+            specialEventKind = kind;
+            specialEventWaiting = true;
+            specialEventOverlayDismissed = false;
+            specialOverlayTitleElement.textContent = title;
+            specialOverlayBonusElement.textContent = bonus;
+            specialOverlayElement.hidden = false;
         }
 
-        function showOuroborosOverlay() {
-            ouroborosOverlayElement.hidden = false;
-        }
-
-        function hideOuroborosOverlay() {
-            ouroborosOverlayElement.hidden = true;
+        function hideSpecialOverlay() {
+            specialOverlayElement.hidden = true;
         }
 
         // Adjust game speed
@@ -1458,10 +1522,12 @@
             document.body.classList.add('playing');
 
             ouroborosTriggered = false;
-            ouroborosWaiting = false;
-            ouroborosOverlayDismissed = false;
-            snakeGolden = false;
-            hideOuroborosOverlay();
+            jormungandrTriggered = false;
+            snakeColorMode = 'normal';
+            specialEventKind = null;
+            specialEventWaiting = false;
+            specialEventOverlayDismissed = false;
+            hideSpecialOverlay();
 
             if (splashLoaded) {
                 splashLoaded = false
@@ -1495,25 +1561,25 @@
                 return; // Don't process direction change after restart
             }
 
-            // R dismisses the Ouroboros overlay, the same as a double-tap -
+            // R dismisses a special-event overlay, the same as a double-tap -
             // it isn't a direction, so (unlike an arrow key) it only
             // dismisses; a swipe or arrow key afterwards sets the first move.
-            if (e.keyCode === R && ouroborosWaiting && !ouroborosOverlayDismissed && e.target.tagName !== 'INPUT') {
-                ouroborosOverlayDismissed = true;
-                hideOuroborosOverlay();
+            if (e.keyCode === R && specialEventWaiting && !specialEventOverlayDismissed && e.target.tagName !== 'INPUT') {
+                specialEventOverlayDismissed = true;
+                hideSpecialOverlay();
                 return;
             }
 
             if (!gameRunning) return;
 
-            // Touch requires a double-tap to dismiss the Ouroboros overlay
-            // before a swipe can set the first direction (see touchend) -
-            // an arrow key press is already unambiguous, so it dismisses
-            // and sets the direction in the same keystroke.
-            if (ouroborosWaiting && !ouroborosOverlayDismissed
+            // Touch requires a double-tap to dismiss a special-event
+            // overlay before a swipe can set the first direction (see
+            // touchend) - an arrow key press is already unambiguous, so it
+            // dismisses and sets the direction in the same keystroke.
+            if (specialEventWaiting && !specialEventOverlayDismissed
                 && (e.keyCode === LEFT || e.keyCode === UP || e.keyCode === RIGHT || e.keyCode === DOWN)) {
-                ouroborosOverlayDismissed = true;
-                hideOuroborosOverlay();
+                specialEventOverlayDismissed = true;
+                hideSpecialOverlay();
             }
 
             // Decide what the "current" direction is for validation
@@ -1617,18 +1683,18 @@
             if (touchIsOnControl) return;
             e.preventDefault();
 
-            // Double-tap to dismiss the Ouroboros overlay - the swipe
+            // Double-tap to dismiss a special-event overlay - the swipe
             // that follows is what actually sets the first direction
             // (handled in update()/touchmove), not this tap itself.
-            if (ouroborosWaiting && !ouroborosOverlayDismissed) {
+            if (specialEventWaiting && !specialEventOverlayDismissed) {
                 const now = new Date().getTime();
-                const tapLength = now - ouroborosLastTap;
+                const tapLength = now - specialEventLastTap;
 
                 if (tapLength < doubleTapDelay && tapLength > 0) {
-                    ouroborosOverlayDismissed = true;
-                    hideOuroborosOverlay();
+                    specialEventOverlayDismissed = true;
+                    hideSpecialOverlay();
                 }
-                ouroborosLastTap = now;
+                specialEventLastTap = now;
                 return;
             }
 
@@ -1655,11 +1721,11 @@
                 lastUpdateTime = time;  // Reset timer
             }
 
-            // The Ouroboros rays rotate against the clock, not the game's
-            // own tick rate - redraw every frame while they're up (i.e.
-            // before the double-tap dismisses them) so the rotation is
-            // smooth instead of stepping once per game tick.
-            if (needsRedraw || (ouroborosWaiting && !ouroborosOverlayDismissed)) {
+            // The special-event rays rotate against the clock, not the
+            // game's own tick rate - redraw every frame while they're up
+            // (i.e. before the double-tap dismisses them) so the rotation
+            // is smooth instead of stepping once per game tick.
+            if (needsRedraw || (specialEventWaiting && !specialEventOverlayDismissed)) {
                 drawGame();
                 needsRedraw = false;
             }

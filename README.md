@@ -31,6 +31,13 @@ installable as a PWA. Live at
   fires once per run; any other self-collision (including hitting a
   non-tail body segment, or a second tail-tip hit) is a normal death.
   Leaderboard entries that triggered it get a ♾️ badge next to the score.
+- **Jörmungandr easter egg**: growing the snake to 80 segments (`JORMUNGANDR_LENGTH`
+  in `index.html`) triggers independently of Ouroboros - either can happen
+  first, neither requires the other, both can happen in the same run. Same
+  shrink-to-1/pause/color treatment as Ouroboros, just teal instead of gold
+  and +1000 instead of +500. A run with both fires shows both badges
+  (♾️🐉). Whichever of the two events fires later wins the snake's color
+  for the rest of the run.
 - **Installable PWA** (`vite-plugin-pwa`, auto-updating service worker) -
   a from-scratch pixel-art "S" icon built from the game's own in-game
   colors (see `public/icon-*.png`, `public/tab_icon.ico`,
