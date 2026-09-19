@@ -20,15 +20,17 @@ installable as a PWA. Live at
   hitting one ends the run just like hitting a wall.
 - **Ouroboros easter egg**: biting your own tail tip (not any other
   self-collision) the first time in a run doesn't kill you - the snake
-  collapses to that point, +500 score, and pauses (golden rays, double-
-  tap or `R` to dismiss) until your next move, then regrows one segment
-  per move back to its prior length and stays gold for the rest of the
-  run. The bonus only affects the score shown/submitted, not the
-  level/speed pacing (that's driven by a separate `pacingScore` that
-  excludes it) - see `triggerOuroboros()` in `index.html`. Only fires
-  once per run; any other self-collision (including hitting a non-tail
-  body segment, or a second tail-tip hit) is a normal death. Leaderboard
-  entries that triggered it get a ♾️ badge next to the score.
+  permanently shrinks to a single square at that point, +500 score, and
+  pauses (golden rays, double-tap or `R` to dismiss) until your next
+  move; it only grows again by eating food from there, same as a fresh
+  run, and stays gold for the rest of the run. A deliberate strategy as
+  much as a bonus: worth reaching for once the snake gets unwieldy at a
+  harder speed tier. The bonus only affects the score shown/submitted,
+  not the level/speed pacing (that's driven by a separate `pacingScore`
+  that excludes it) - see `triggerOuroboros()` in `index.html`. Only
+  fires once per run; any other self-collision (including hitting a
+  non-tail body segment, or a second tail-tip hit) is a normal death.
+  Leaderboard entries that triggered it get a ♾️ badge next to the score.
 - **Installable PWA** (`vite-plugin-pwa`, auto-updating service worker) -
   a from-scratch pixel-art "S" icon built from the game's own in-game
   colors (see `public/icon-*.png`, `public/tab_icon.ico`,

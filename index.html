@@ -879,7 +879,6 @@
         let ouroborosWaiting = false;
         let ouroborosOverlayDismissed = false;
         let ouroborosLastTap = 0;
-        let ouroborosRegrowTarget = 0;
         let snakeGolden = false;
 
         //Handle splash screen image
@@ -1353,25 +1352,19 @@
                 randomFood();
                 randomBadFood();
 
-            } else if (snake.length <= ouroborosRegrowTarget) {
-                // Regrowing back to pre-Ouroboros length - don't shrink
-                // the tail until it catches back up. snake.length here is
-                // already post-unshift (one longer than before this move),
-                // so <= (not <) is what actually stops right at the target
-                // instead of one segment short of it.
             } else {
                 snake.pop();
             }
         }
 
         // Ouroboros easter egg: biting your own tail the first time in a
-        // run doesn't kill you - the loop collapses to the point it
-        // closed at, the run continues from there, and the snake regrows
-        // (one segment per move, same as normal growth) back to the
-        // length it had the instant before. Only fires once per game;
-        // any later self-collision is a normal death.
+        // run doesn't kill you - the snake permanently shrinks to a single
+        // square at the point the loop closed, and the run continues from
+        // there (growing again only by eating food, same as a fresh run).
+        // A deliberate strategy, not just a one-off bonus: worth reaching
+        // for once the snake gets unwieldy at a harder speed tier. Only
+        // fires once per game; any later self-collision is a normal death.
         function triggerOuroboros(head) {
-            ouroborosRegrowTarget = snake.length;
             snake = [{x: head.x, y: head.y}];
             ouroborosTriggered = true;
             snakeGolden = true;
@@ -1467,7 +1460,6 @@
             ouroborosTriggered = false;
             ouroborosWaiting = false;
             ouroborosOverlayDismissed = false;
-            ouroborosRegrowTarget = 0;
             snakeGolden = false;
             hideOuroborosOverlay();
 
