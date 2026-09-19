@@ -80,8 +80,12 @@ a single run can earn all three.
   `spawnBasilisk()`) that sit on that same side of center - e.g.
   swiping right picks randomly among the right column's 3 tiles (the
   side tile and both corners) and gazes right from whichever one it
-  lands on. This also guarantees the wall never originates at the
-  center itself, which is where a forgiven death always respawns. The
+  lands on - excluding whichever of those 3 shares the snake's current
+  row (or column, for an up/down swipe), so an Ouroboros bite that
+  happened to land within the middle 3 rows/columns can't put the wall
+  right on the snake's own row/column the instant it appears. This
+  also guarantees the wall never originates at the center itself,
+  which is where a forgiven death always respawns. The
   origin tile is stone gray with two purple eyes; the rest of the line
   is the gaze itself, drawn in purple, since that's the part you
   actually can't enter. Touching any tile of the wall, including its head, is its own death
