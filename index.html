@@ -275,6 +275,26 @@
             opacity: 0.9;
         }
 
+        .nickname-discard {
+            width: 100%;
+            padding: 8px;
+            margin-top: 8px;
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            background: transparent;
+            color: var(--muted-foreground);
+            font-family: var(--font-mono);
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            cursor: pointer;
+        }
+
+        .nickname-discard:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
         .canvas-frame {
             position: relative;
             padding: 10px;
@@ -597,13 +617,14 @@
         <div class="info-panel corner-ticks" role="dialog" aria-modal="true" aria-labelledby="nicknameTitle">
             <div class="info-panel-header">
                 <h2 id="nicknameTitle">Top 5 Score!</h2>
-                <button type="button" id="nicknameSkipButton" class="info-close" aria-label="Skip">&times;</button>
+                <button type="button" id="nicknameSkipButton" class="info-close" aria-label="Don't save">&times;</button>
             </div>
 
             <p class="nickname-prompt-text">Add a nickname to the leaderboard? (optional)</p>
             <input type="text" id="nicknameInput" class="nickname-input" maxlength="15" placeholder="Your nickname" autocomplete="off">
             <div id="nicknameError" class="nickname-error" hidden></div>
             <button type="button" id="nicknameSaveButton" class="nickname-save">Save score</button>
+            <button type="button" id="nicknameDiscardButton" class="nickname-discard">Don't save</button>
         </div>
     </div>
 
@@ -754,6 +775,7 @@
         const nicknameInput = document.getElementById('nicknameInput');
         const nicknameError = document.getElementById('nicknameError');
         const nicknameSaveButton = document.getElementById('nicknameSaveButton');
+        const nicknameDiscardButton = document.getElementById('nicknameDiscardButton');
         const nicknameSkipButton = document.getElementById('nicknameSkipButton');
         const NICKNAME_PATTERN = /^[A-Za-z0-9 _.-]*$/;
         let pendingNicknameScore = null;
@@ -793,25 +815,27 @@
             submitScoreWithNickname(scoreToSubmit, nickname);
         }
 
-        function skipNickname() {
-            const scoreToSubmit = pendingNicknameScore;
+        // Closing the prompt without saving - not the same as saving
+        // anonymously (an empty nickname in saveNickname() still submits
+        // the score). This discards the run's score entirely.
+        function discardScore() {
             closeNicknameOverlay();
-            submitScoreWithNickname(scoreToSubmit, '');
         }
 
         nicknameSaveButton.addEventListener('click', saveNickname);
-        nicknameSkipButton.addEventListener('click', skipNickname);
+        nicknameDiscardButton.addEventListener('click', discardScore);
+        nicknameSkipButton.addEventListener('click', discardScore);
 
         nicknameInput.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') saveNickname();
         });
 
         nicknameOverlay.addEventListener('click', (e) => {
-            if (e.target === nicknameOverlay) skipNickname();
+            if (e.target === nicknameOverlay) discardScore();
         });
 
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && !nicknameOverlay.hidden) skipNickname();
+            if (e.key === 'Escape' && !nicknameOverlay.hidden) discardScore();
         });
 
         // Game settings
@@ -968,9 +992,10 @@
             topScoresElement.innerHTML = '';
             displayEntries.forEach((entry, index) => {
                 const line = document.createElement('div');
+                const badge = entry.ouroboros ? ' ♾️' : '';
                 line.textContent = entry.nickname
-                    ? `${index + 1}. ${entry.score} - ${entry.nickname}${entry.ouroboros ? ' ♾️' : ''}`
-                    : `${index + 1}. ${entry.score}`;
+                    ? `${index + 1}. ${entry.score} - ${entry.nickname}${badge}`
+                    : `${index + 1}. ${entry.score}${badge}`;
                 topScoresElement.appendChild(line);
             });
         }
@@ -1277,13 +1302,18 @@
                 return;
             }
 
-            // Check self collision
-            for (let segment of snake) {
+            // Check self collision - Ouroboros only fires for the true
+            // myth (biting your own tail TIP), not any other body
+            // segment. Hitting a corner or a middle segment is a normal
+            // death, same as it always was, even on the first collision.
+            for (let i = 0; i < snake.length; i++) {
+                const segment = snake[i];
                 if (head.x === segment.x && head.y === segment.y) {
-                    if (ouroborosTriggered) {
-                        gameOver('self');
-                    } else {
+                    const isTailTip = i === snake.length - 1;
+                    if (!ouroborosTriggered && isTailTip) {
                         triggerOuroboros(head);
+                    } else {
+                        gameOver('self');
                     }
                     return;
                 }
