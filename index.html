@@ -971,9 +971,10 @@
         // life is already spent).
         let respawnMessageShowing = false;
 
-        // Which snake color to draw - sticks after whichever fired most
-        // recently (if a game gets more than one, the latest wins).
-        let snakeColorMode = 'normal'; // 'normal' | 'ouroboros' | 'jormungandr' | 'basilisk'
+        // Which snake color to draw - sticks after whichever of Ouroboros/
+        // Jörmungandr fired most recently. Outgazing the Basilisk never
+        // sets this (see SNAKE_COLORS/triggerBasiliskSurvived()).
+        let snakeColorMode = 'normal'; // 'normal' | 'ouroboros' | 'jormungandr'
 
         // The shared pause: 'kind' says which event is currently waiting,
         // so the overlay text/bonus and the rays' color know what to show.
@@ -1384,15 +1385,17 @@
                 ctx.fillRect(px + 13, py + 1, 3, 2);
             }
             
-            // Normal green body/head, unless a special event has fired -
-            // gold for Ouroboros, teal for Jörmungandr, stone gray for the
-            // Basilisk (whichever fired most recently, if a run gets more
-            // than one).
+            // Normal green body/head, unless Ouroboros or Jörmungandr has
+            // fired - gold or teal respectively, whichever fired most
+            // recently. Outgazing the Basilisk doesn't change this - gray
+            // only ever shows up on its death screen, never on the living
+            // snake, so an unlucky interleaving (e.g. reaching Jörmungandr
+            // mid-Basilisk-countdown, then outgazing it after) can't
+            // overwrite a color you already earned.
             const SNAKE_COLORS = {
                 normal: { body: '#ADDDBB', head: '#32A956' },
                 ouroboros: { body: '#FFD700', head: '#DAA520' },
                 jormungandr: { body: '#20B2AA', head: '#006666' },
-                basilisk: { body: '#8B8B83', head: '#5A5A52' },
             };
             const snakeColors = SNAKE_COLORS[snakeColorMode];
 
@@ -1733,7 +1736,8 @@
             basiliskActive = false;
             basiliskWall = [];
             basiliskTriggered = true;
-            snakeColorMode = 'basilisk';
+            // Deliberately doesn't touch snakeColorMode - see SNAKE_COLORS
+            // above for why.
 
             score += 750;
             scoreElement.textContent = score;

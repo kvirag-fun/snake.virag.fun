@@ -92,11 +92,17 @@ a single run can earn all three.
   it spawned (`BASILISK_FOOD_COUNT`) - not 15 raw moves, so circling in
   place can't clear it for free, you have to actually keep playing.
   Surviving to see it clear is the achievement: same pause/rays
-  treatment, +750, stone gray, 🗿 badge. Only ever spawns once per run.
+  treatment, +750, 🗿 badge - deliberately doesn't change the snake's
+  color (see below). Only ever spawns once per run.
 
-Whichever of the three fired most recently wins the snake's color for
-the rest of the run, and a run that earns more than one shows all of
-their badges together next to the score.
+Ouroboros and Jörmungandr each set the snake's color (gold, teal -
+whichever fired most recently) for the rest of the run; outgazing the
+Basilisk never does, so an unlucky interleaving (e.g. reaching
+Jörmungandr's length while the Basilisk's wall is still up, then
+outgazing it afterward) can't overwrite a color you already earned -
+gray only ever shows up on the Basilisk's own death screen, never on
+the living snake. A run that earns more than one shows all of their
+badges together next to the score regardless.
 
 ## Running locally
 
