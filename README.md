@@ -90,8 +90,12 @@ can earn all three.
   it spawned (`BASILISK_FOOD_COUNT`) - not 15 raw moves, so circling in
   place can't clear it for free, you have to actually keep playing.
   Surviving to see it clear is the achievement: same pause/rays
-  treatment, +750, 🗿 badge - deliberately doesn't change the snake's
-  color (see below). Only ever spawns once per run.
+  treatment as Ouroboros, right down to collapsing to a single tile and
+  regrowing back out one tile per move once play resumes (`regrowPending`)
+  - +750, 🗿 badge, deliberately doesn't change the snake's body color
+  (see below) - the one permanent trace it leaves is the snake's own
+  eyes turning the same dark purple as the Basilisk's, for the rest of
+  the run. Only ever spawns once per run.
 - **Jörmungandr**: growing the snake to 80 segments (`JORMUNGANDR_LENGTH`
   in `index.html`) triggers it - but only once the Basilisk has been
   outgazed this run, and even then only re-checked on your next actual
