@@ -71,17 +71,20 @@ a single run can earn all three.
   just teal instead of gold and +1000 instead of +500. Leaderboard
   entries get a 🐉 badge.
 - **Basilisk**: appears the instant you swipe to resume after
-  Ouroboros's own pause, on one of the 8 tiles surrounding the board's
-  center (a 3x3 area minus the middle, picked at random each time - see
-  `BASILISK_SPAWN_OFFSETS`/`spawnBasilisk()`), gazing a wall out to the
-  board edge. The origin tile is its head - stone gray, with two purple
-  eyes; the rest of the line is the gaze itself, drawn in purple, since
-  that's the part you actually can't enter. A side tile gazes straight
-  outward in that same direction; a corner tile doesn't gaze diagonally
-  - it picks one of its two component directions 50/50 - so the wall is
-  always a straight line, and (deliberately) never originates at the
-  center itself, which is where a forgiven death always respawns.
-  Touching any tile of the wall, including its head, is its own death
+  Ouroboros's own pause, gazing a wall out to the board edge in exactly
+  the direction of that swipe - never some unrelated random direction,
+  so it's never a surprise: it only ever extends further along the
+  path you were already about to take. The origin (its head) is picked
+  at random from the 3 of the 8 tiles surrounding the board's center (a
+  3x3 area minus the middle - see `BASILISK_SPAWN_OFFSETS`/
+  `spawnBasilisk()`) that sit on that same side of center - e.g.
+  swiping right picks randomly among the right column's 3 tiles (the
+  side tile and both corners) and gazes right from whichever one it
+  lands on. This also guarantees the wall never originates at the
+  center itself, which is where a forgiven death always respawns. The
+  origin tile is stone gray with two purple eyes; the rest of the line
+  is the gaze itself, drawn in purple, since that's the part you
+  actually can't enter. Touching any tile of the wall, including its head, is its own death
   cause - "You gazed into the Basilisk's eyes," with a game-over screen
   showing the snake turned to stone (same art as the other game-over
   screens, just recolored gray) - still forgiven by a banked Ouroboros

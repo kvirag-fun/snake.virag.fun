@@ -1460,7 +1460,7 @@
                 specialEventWaiting = false;
                 specialEventKind = null;
                 if (resumedKind === 'ouroboros' && !basiliskTriggered && !basiliskActive) {
-                    spawnBasilisk();
+                    spawnBasilisk(nextDx, nextDy);
                 }
             }
 
@@ -1674,14 +1674,7 @@
         }
 
         // The 8 tiles surrounding the board's center (a 3x3 area minus the
-        // middle) - one is picked at random each time the Basilisk spawns.
-        // The 4 orthogonal ones (sides) gaze straight outward in that same
-        // direction, obviously. A diagonal one (corner) doesn't gaze
-        // diagonally - it picks one of its two component directions 50/50
-        // (see spawnBasilisk() below), so the wall is always a straight
-        // horizontal/vertical line regardless of which of the 8 it lands
-        // on, and - critically - never originates at the center itself,
-        // where a forgiven death always respawns (see respawnWithSameLength()).
+        // middle).
         const BASILISK_SPAWN_OFFSETS = [
             {x: 0, y: -1}, {x: 0, y: 1}, {x: -1, y: 0}, {x: 1, y: 0}, // sides
             {x: -1, y: -1}, {x: 1, y: -1}, {x: -1, y: 1}, {x: 1, y: 1}, // corners
@@ -1690,31 +1683,36 @@
         // Basilisk easter egg: can only appear after Ouroboros has already
         // fired (see the specialEventWaiting-resume branch in update(),
         // which calls this) - spawns the moment play resumes after
-        // Ouroboros's own pause, on one of the 8 tiles around the board's
-        // center (see BASILISK_SPAWN_OFFSETS above), gazing a wall of
-        // blocked tiles from there to the board edge. Touching any tile of
-        // it, including the origin, is a death like any wall (see the
-        // basiliskActive check in update()).
-        function spawnBasilisk() {
+        // Ouroboros's own pause, gazing a wall of blocked tiles out to the
+        // board edge. Touching any tile of it, including the origin, is a
+        // death like any wall (see the basiliskActive check in update()).
+        //
+        // The gaze always points the same way the player just swiped to
+        // resume (headingX/headingY) - never some unrelated random
+        // direction - so it's never a surprise: it only ever extends
+        // further along the path you were already about to take, rather
+        // than potentially appearing behind you or across it. The origin
+        // is picked at random from the 3 of the 8 surrounding tiles that
+        // sit on that same side of center (e.g. heading right picks
+        // randomly among the right column's 3 tiles - side, upper-corner,
+        // lower-corner - and gazes right from whichever one it lands on).
+        // This also guarantees it never originates at the center itself,
+        // where a forgiven death always respawns (see respawnWithSameLength()).
+        function spawnBasilisk(headingX, headingY) {
             const centerX = Math.floor(tileCount / 2);
             const centerY = Math.floor(tileCount / 2);
-            const offset = BASILISK_SPAWN_OFFSETS[Math.floor(Math.random() * BASILISK_SPAWN_OFFSETS.length)];
+            const candidates = BASILISK_SPAWN_OFFSETS.filter((o) =>
+                headingX !== 0 ? o.x === headingX : o.y === headingY
+            );
+            const offset = candidates[Math.floor(Math.random() * candidates.length)];
             const originX = centerX + offset.x;
             const originY = centerY + offset.y;
 
-            let gazeX = offset.x;
-            let gazeY = offset.y;
-            if (gazeX !== 0 && gazeY !== 0) {
-                // A corner spawn - gaze along one of its two component
-                // directions, chosen 50/50, instead of diagonally.
-                if (Math.random() < 0.5) gazeY = 0; else gazeX = 0;
-            }
-
             const wall = [{x: originX, y: originY}];
             let x = originX, y = originY;
-            while (x + gazeX >= 0 && x + gazeX < tileCount && y + gazeY >= 0 && y + gazeY < tileCount) {
-                x += gazeX;
-                y += gazeY;
+            while (x + headingX >= 0 && x + headingX < tileCount && y + headingY >= 0 && y + headingY < tileCount) {
+                x += headingX;
+                y += headingY;
                 wall.push({x, y});
             }
             basiliskWall = wall;
