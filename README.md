@@ -71,17 +71,22 @@ a single run can earn all three.
   just teal instead of gold and +1000 instead of +500. Leaderboard
   entries get a 🐉 badge.
 - **Basilisk**: appears the instant you swipe to resume after
-  Ouroboros's own pause - its gaze projects a wall of stone-gray tiles
-  from the board's center out to the edge, in the direction *behind*
-  your newly-resumed heading (closing off your retreat, not blocking
-  the path ahead - see `spawnBasilisk()`). Touching any tile of it,
-  including the center origin, is a death like any wall (a banked
-  Ouroboros life still forgives it, same as any other death). The wall
-  stays up until 15 apples have been eaten since it spawned
-  (`BASILISK_FOOD_COUNT`) - not 15 raw moves, so circling in place can't
-  clear it for free, you have to actually keep playing. Surviving to
-  see it clear is the achievement: same pause/rays treatment, +1500,
-  stone gray, 🗿 badge. Only ever spawns once per run.
+  Ouroboros's own pause, on one of the 8 tiles surrounding the board's
+  center (a 3x3 area minus the middle, picked at random each time - see
+  `BASILISK_SPAWN_OFFSETS`/`spawnBasilisk()`), gazing a wall of
+  stone-gray tiles from there out to the board edge. A side tile gazes
+  straight outward in that same direction; a corner tile doesn't gaze
+  diagonally - it picks one of its two component directions 50/50 -
+  so the wall is always a straight line, and (deliberately) never
+  originates at the center itself, which is where a forgiven death
+  always respawns. Touching any tile of the wall, including its origin,
+  is a death like any wall (a banked Ouroboros life still forgives it,
+  same as any other death). The wall stays up until 15 apples have been
+  eaten since it spawned (`BASILISK_FOOD_COUNT`) - not 15 raw moves, so
+  circling in place can't clear it for free, you have to actually keep
+  playing. Surviving to see it clear is the achievement: same
+  pause/rays treatment, +1500, stone gray, 🗿 badge. Only ever spawns
+  once per run.
 
 Whichever of the three fired most recently wins the snake's color for
 the rest of the run, and a run that earns more than one shows all of
