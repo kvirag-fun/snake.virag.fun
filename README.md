@@ -13,7 +13,8 @@ built and deployed with Vite. Live at
   you lift it).
 - **Four difficulty levels** (Viper, Python, Anaconda, King Cobra), each
   with its own **global top-5 leaderboard** shared across everyone who
-  plays, backed by Firestore.
+  plays, backed by Firestore. Making the top 5 prompts for an optional
+  nickname (client-side profanity/charset filtered).
 - **Bad food**: occasional hazard tiles mixed in with regular food —
   hitting one ends the run just like hitting a wall or yourself.
 - **Sound effects** for eating food and game over (toggleable), plus a
@@ -59,8 +60,13 @@ the other virag.fun apps, there's no login here (it's a public game), so
 `firestore.rules` is the *entire* anti-cheat model: reads are public,
 writes are validated entirely server-side (`difficulty` must be one of
 the 4 real values, `score` must be a non-negative integer no higher than
-the board can actually produce, `createdAt` must be the server's own
-timestamp), and nothing can ever be updated or deleted once written.
+the board can actually produce, `nickname` (optional) must be a string
+of 15 characters or fewer restricted to a safe charset, `createdAt` must
+be the server's own timestamp), and nothing can ever be updated or
+deleted once written. The rule's charset check is a length/injection
+guard, not profanity filtering — a rule can't practically match against
+a word list, so that check lives client-side in `index.html` instead and
+isn't a security boundary.
 
 The Firebase web config in `index.html` isn't a secret (it only says
 which project to talk to — the rule above is what actually protects the

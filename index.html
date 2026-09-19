@@ -235,6 +235,56 @@
             margin-right: 0.5em;
         }
 
+        .nickname-prompt-text {
+            margin: 0 0 10px;
+            font-size: 14px;
+            color: var(--muted-foreground);
+        }
+
+        .nickname-input {
+            width: 100%;
+            box-sizing: border-box;
+            padding: 8px 10px;
+            margin-bottom: 8px;
+            border: 1px solid var(--border);
+            border-radius: 3px;
+            background: var(--card);
+            color: var(--foreground);
+            font-family: var(--font-sans);
+            /* 16px minimum - see #difficultySelect's comment on the same
+               iOS Safari auto-zoom-on-focus quirk. */
+            font-size: 16px;
+        }
+
+        .nickname-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .nickname-error {
+            margin-bottom: 8px;
+            font-size: 12px;
+            color: var(--markup);
+        }
+
+        .nickname-save {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid var(--primary);
+            border-radius: 3px;
+            background: var(--primary);
+            color: var(--card);
+            font-family: var(--font-mono);
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            cursor: pointer;
+        }
+
+        .nickname-save:hover {
+            opacity: 0.9;
+        }
+
         .canvas-frame {
             position: relative;
             padding: 10px;
@@ -508,7 +558,22 @@
                 <li>Running into a wall, yourself, or a rotten apple ends the run.</li>
                 <li>Four difficulty levels change how fast the snake moves - Viper is slowest, King Cobra fastest.</li>
                 <li>Each difficulty has its own global top-5 leaderboard, shared by everyone who plays.</li>
+                <li>Make the top 5 and you can add an optional nickname.</li>
             </ul>
+        </div>
+    </div>
+
+    <div id="nicknameOverlay" class="info-overlay" hidden>
+        <div class="info-panel corner-ticks" role="dialog" aria-modal="true" aria-labelledby="nicknameTitle">
+            <div class="info-panel-header">
+                <h2 id="nicknameTitle">Top 5 Score!</h2>
+                <button type="button" id="nicknameSkipButton" class="info-close" aria-label="Skip">&times;</button>
+            </div>
+
+            <p class="nickname-prompt-text">Add a nickname to the leaderboard? (optional)</p>
+            <input type="text" id="nicknameInput" class="nickname-input" maxlength="15" placeholder="Your nickname" autocomplete="off">
+            <div id="nicknameError" class="nickname-error" hidden></div>
+            <button type="button" id="nicknameSaveButton" class="nickname-save">Save score</button>
         </div>
     </div>
 
@@ -573,13 +638,14 @@
                 limit(5)
             );
             const snap = await getDocs(q);
-            return snap.docs.map((d) => d.data().score);
+            return snap.docs.map((d) => ({ score: d.data().score, nickname: d.data().nickname || '' }));
         };
 
-        window.submitGlobalScore = async function submitGlobalScore(difficulty, score) {
+        window.submitGlobalScore = async function submitGlobalScore(difficulty, score, nickname) {
             await addDoc(collection(db, 'snakeScores'), {
                 difficulty,
                 score,
+                nickname: nickname || '',
                 createdAt: serverTimestamp(),
             });
         };
@@ -631,6 +697,72 @@
 
         document.addEventListener('keydown', (e) => {
             if (e.key === 'Escape' && !infoOverlay.hidden) closeInfoOverlay();
+        });
+
+        // Optional nickname prompt, shown from gameOver() only when a run
+        // actually qualifies for the top 5 (see qualifiesForTop5 above).
+        const nicknameOverlay = document.getElementById('nicknameOverlay');
+        const nicknameInput = document.getElementById('nicknameInput');
+        const nicknameError = document.getElementById('nicknameError');
+        const nicknameSaveButton = document.getElementById('nicknameSaveButton');
+        const nicknameSkipButton = document.getElementById('nicknameSkipButton');
+        const NICKNAME_PATTERN = /^[A-Za-z0-9 _.-]*$/;
+        let pendingNicknameScore = null;
+
+        function openNicknameOverlay(scoreForNickname) {
+            pendingNicknameScore = scoreForNickname;
+            nicknameInput.value = '';
+            nicknameError.hidden = true;
+            nicknameOverlay.hidden = false;
+            nicknameInput.focus();
+        }
+
+        function closeNicknameOverlay() {
+            nicknameOverlay.hidden = true;
+            pendingNicknameScore = null;
+        }
+
+        function showNicknameError(message) {
+            nicknameError.textContent = message;
+            nicknameError.hidden = false;
+        }
+
+        function saveNickname() {
+            const nickname = nicknameInput.value.trim();
+
+            if (nickname && !NICKNAME_PATTERN.test(nickname)) {
+                showNicknameError('Letters, numbers, spaces, and - _ . only.');
+                return;
+            }
+            if (containsProfanity(nickname)) {
+                showNicknameError('Please choose a different nickname.');
+                return;
+            }
+
+            const scoreToSubmit = pendingNicknameScore;
+            closeNicknameOverlay();
+            submitScoreWithNickname(scoreToSubmit, nickname);
+        }
+
+        function skipNickname() {
+            const scoreToSubmit = pendingNicknameScore;
+            closeNicknameOverlay();
+            submitScoreWithNickname(scoreToSubmit, '');
+        }
+
+        nicknameSaveButton.addEventListener('click', saveNickname);
+        nicknameSkipButton.addEventListener('click', skipNickname);
+
+        nicknameInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') saveNickname();
+        });
+
+        nicknameOverlay.addEventListener('click', (e) => {
+            if (e.target === nicknameOverlay) skipNickname();
+        });
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !nicknameOverlay.hidden) skipNickname();
         });
 
         // Game settings
@@ -730,9 +862,37 @@
         }
 
         // Leaderboard management - global top 5, backed by Firestore.
-        async function updateLeaderboard(newScore) {
+        // cachedTop5 mirrors whatever's currently on screen for the
+        // selected difficulty, so gameOver() can tell synchronously
+        // whether a just-finished run actually qualifies, without an
+        // extra round trip.
+        let cachedTop5 = [];
+
+        function qualifiesForTop5(newScore) {
+            if (newScore <= 0) return false;
+            if (cachedTop5.length < 5) return true;
+            return newScore > Math.min(...cachedTop5.map((entry) => entry.score));
+        }
+
+        // Client-side only - a Firestore rule can't practically match
+        // against a word list (see firestore.rules), so this isn't a
+        // security boundary. It just keeps obviously inappropriate
+        // nicknames from ever being submitted in the first place; the
+        // rule's charset restriction is what actually guards the data.
+        const PROFANITY_WORDS = [
+            'fuck', 'shit', 'bitch', 'asshole', 'bastard', 'cunt', 'dick',
+            'pussy', 'cock', 'whore', 'slut', 'fag', 'faggot', 'nigger',
+            'nigga', 'retard', 'rape', 'molest', 'nazi', 'hitler', 'kys',
+        ];
+
+        function containsProfanity(text) {
+            const normalized = text.toLowerCase().replace(/[^a-z]/g, '');
+            return PROFANITY_WORDS.some((word) => normalized.includes(word));
+        }
+
+        async function submitScoreWithNickname(finalScore, nickname) {
             try {
-                await submitGlobalScore(difficultySelect.value, newScore);
+                await submitGlobalScore(difficultySelect.value, finalScore, nickname);
             } catch (e) {
                 console.warn('Could not submit score to the global leaderboard:', e);
             }
@@ -740,21 +900,27 @@
             displayLeaderboard();
         }
 
-        function renderScores(scores) {
-            let displayScores = [...scores];
-            while (displayScores.length < 5) {
-                displayScores.push(0);
+        function renderScores(entries) {
+            let displayEntries = [...entries];
+            while (displayEntries.length < 5) {
+                displayEntries.push({ score: 0, nickname: '' });
             }
 
             const topScoresElement = document.getElementById('topScoresList');
-            topScoresElement.innerHTML = displayScores.map((score, index) =>
-                `${index + 1}. ${score}`
-            ).join('<br>');
+            topScoresElement.innerHTML = '';
+            displayEntries.forEach((entry, index) => {
+                const line = document.createElement('div');
+                line.textContent = entry.nickname
+                    ? `${index + 1}. ${entry.nickname} - ${entry.score}`
+                    : `${index + 1}. ${entry.score}`;
+                topScoresElement.appendChild(line);
+            });
         }
 
         async function displayLeaderboard() {
             try {
                 const globalScores = await fetchGlobalTop5(difficultySelect.value);
+                cachedTop5 = globalScores;
                 renderScores(globalScores);
             } catch (e) {
                 console.warn('Could not load the global leaderboard:', e);
@@ -1041,8 +1207,14 @@
             // needs to come back after this run ends.
             gameOverBottomElement.hidden = false;
 
-            // Update leaderboard with FINAL score only
-            updateLeaderboard(score);
+            // Update leaderboard with FINAL score only - prompt for an
+            // optional nickname only when the run actually made the top 5,
+            // otherwise submit right away same as before.
+            if (qualifiesForTop5(score)) {
+                openNicknameOverlay(score);
+            } else {
+                submitScoreWithNickname(score, '');
+            }
 
             // Toggle difficulty selector to ON
             toggleDifficultySelector();
@@ -1092,8 +1264,10 @@
         document.addEventListener('keydown', (e) => {
             const LEFT = 37, UP = 38, RIGHT = 39, DOWN = 40, R = 82;
         
-            // R key ONLY restarts when game over
-            if (e.keyCode === R && !gameRunning) {
+            // R key ONLY restarts when game over - but not while typing a
+            // nickname (or anything else) into a text input, where an "r"
+            // keystroke should just be an "r" keystroke.
+            if (e.keyCode === R && !gameRunning && e.target.tagName !== 'INPUT') {
                 restart();
                 return; // Don't process direction change after restart
             }
@@ -1124,7 +1298,7 @@
         const minSwipeDistance = 20;
 
         function isFormControl(target) {
-            return target.closest('select, input, label, #infoOverlay, #infoButton') !== null;
+            return target.closest('select, input, label, #infoOverlay, #infoButton, #nicknameOverlay') !== null;
         }
 
         document.addEventListener('touchstart', (e) => {
