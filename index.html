@@ -918,8 +918,19 @@
         }
 
         async function displayLeaderboard() {
+            // Capture which difficulty this fetch is for, and only apply
+            // the result if that's still selected when it resolves - two
+            // overlapping fetches (e.g. a difficulty change right after
+            // page load, or a change while the post-submit refresh from
+            // gameOver() is still in flight) can otherwise resolve out of
+            // order, letting a slower, stale-difficulty response overwrite
+            // cachedTop5. That silently corrupts qualifiesForTop5()'s
+            // comparison (checked against the wrong difficulty's scores)
+            // and the board shown on screen.
+            const requestedDifficulty = difficultySelect.value;
             try {
-                const globalScores = await fetchGlobalTop5(difficultySelect.value);
+                const globalScores = await fetchGlobalTop5(requestedDifficulty);
+                if (difficultySelect.value !== requestedDifficulty) return;
                 cachedTop5 = globalScores;
                 renderScores(globalScores);
             } catch (e) {
