@@ -651,8 +651,13 @@
                 <li>Four difficulty levels change how fast the snake moves - Viper is slowest, King Cobra fastest.</li>
                 <li>Each difficulty has its own global top-5 leaderboard, shared by everyone who plays.</li>
                 <li>Make the top 5 and you can add an optional nickname.</li>
+            </ul>
+
+            <div class="panel-title">Fairytales</div>
+            <ul class="info-list">
                 <li>Some say a snake that bites its own tail doesn't die.</li>
                 <li>Legends also speak of a serpent that grows long enough to encircle the world.</li>
+                <li>And beware the serpent-king whose gaze alone can turn you to stone.</li>
             </ul>
         </div>
     </div>
@@ -1658,15 +1663,11 @@
         // segments - but only reachable once Ouroboros has already fired
         // this run (see the gating comment on ouroborosTriggered above).
         // Once unlocked it can fire any time after, via any growth - food
-        // or regrow - and also only once per game. Same shrink-and-pause
-        // treatment, its own color and bonus.
+        // or regrow - and also only once per game. Doesn't touch the
+        // snake's length or position at all (if this fires mid-regrow
+        // after an Ouroboros collapse, that regrow just continues
+        // unaffected) - same pause treatment, its own color and bonus.
         function triggerJormungandr() {
-            const headPos = snake[0];
-            snake = [{x: headPos.x, y: headPos.y}];
-            // If this fired mid-regrow (growing back out after an
-            // Ouroboros collapse or a forgiven death), that old target
-            // length is moot now - Jörmungandr's own shrink-to-1 wins.
-            regrowPending = 0;
             jormungandrTriggered = true;
             snakeColorMode = 'jormungandr';
 

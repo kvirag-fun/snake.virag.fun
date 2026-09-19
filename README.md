@@ -64,12 +64,11 @@ a single run can earn all three.
 - **Jörmungandr**: growing the snake to 80 segments (`JORMUNGANDR_LENGTH`
   in `index.html`) triggers it - but only once Ouroboros has already
   fired this run (Ouroboros's free life, if still banked, carries
-  through unaffected - only its own regrow-to-old-length target is
-  cancelled if Jörmungandr fires mid-regrow, since its own shrink-to-1
-  wins). Unlike Ouroboros, this one does shrink to 1 square and stays
-  there - no regrow - pause/rays/color otherwise the same treatment,
-  just teal instead of gold and +1000 instead of +500. Leaderboard
-  entries get a 🐉 badge.
+  through unaffected, and so does an in-progress regrow if this fires
+  mid-regrow after an Ouroboros collapse - Jörmungandr doesn't touch
+  the snake's length or position at all). Pause/rays/color otherwise
+  the same treatment as Ouroboros, just teal instead of gold and +1000
+  instead of +500. Leaderboard entries get a 🐉 badge.
 - **Basilisk**: appears the instant you swipe to resume after
   Ouroboros's own pause, gazing a wall out to the board edge in exactly
   the direction of that swipe - never some unrelated random direction,
