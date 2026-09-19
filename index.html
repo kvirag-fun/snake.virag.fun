@@ -852,6 +852,8 @@
         // the first time it happens per game. See triggerOuroboros() below.
         let ouroborosTriggered = false;
         let ouroborosWaiting = false;
+        let ouroborosOverlayDismissed = false;
+        let ouroborosLastTap = 0;
         let ouroborosRegrowTarget = 0;
         let snakeGolden = false;
 
@@ -1213,6 +1215,15 @@
         function update() {
             if (!gameRunning) return;
 
+            // The Ouroboros overlay needs a double-tap (or an arrow key -
+            // see the keydown handler) to dismiss before any swipe/key
+            // counts as a direction - discard anything that snuck into
+            // the queue in the meantime so it can't become the first move.
+            if (ouroborosWaiting && !ouroborosOverlayDismissed) {
+                inputQueue = [];
+                return;
+            }
+
             // Get next direction from queue OR use current dx/dy
             let nextDx = dx;
             let nextDy = dy;
@@ -1225,11 +1236,10 @@
             // Don't move if no direction set
             if (nextDx === 0 && nextDy === 0) return;
 
-            // A direction just arrived while waiting out the Ouroboros
-            // pause - resume normally from here on.
+            // A direction just arrived after the overlay was dismissed -
+            // resume normally from here on.
             if (ouroborosWaiting) {
                 ouroborosWaiting = false;
-                hideOuroborosOverlay();
             }
 
             const head = {x: snake[0].x + nextDx, y: snake[0].y + nextDy};
@@ -1311,6 +1321,7 @@
             dy = 0;
             inputQueue = [];
             ouroborosWaiting = true;
+            ouroborosOverlayDismissed = false;
             showOuroborosOverlay();
         }
 
@@ -1390,6 +1401,7 @@
 
             ouroborosTriggered = false;
             ouroborosWaiting = false;
+            ouroborosOverlayDismissed = false;
             ouroborosRegrowTarget = 0;
             snakeGolden = false;
             hideOuroborosOverlay();
@@ -1427,7 +1439,17 @@
             }
 
             if (!gameRunning) return;
-            
+
+            // Touch requires a double-tap to dismiss the Ouroboros overlay
+            // before a swipe can set the first direction (see touchend) -
+            // an arrow key press is already unambiguous, so it dismisses
+            // and sets the direction in the same keystroke.
+            if (ouroborosWaiting && !ouroborosOverlayDismissed
+                && (e.keyCode === LEFT || e.keyCode === UP || e.keyCode === RIGHT || e.keyCode === DOWN)) {
+                ouroborosOverlayDismissed = true;
+                hideOuroborosOverlay();
+            }
+
             // Decide what the "current" direction is for validation
             const lastDir = inputQueue.length > 0 ? inputQueue.at(-1) : { dx, dy };
 
@@ -1528,6 +1550,21 @@
         document.addEventListener('touchend', (e) => {
             if (touchIsOnControl) return;
             e.preventDefault();
+
+            // Double-tap to dismiss the Ouroboros overlay - the swipe
+            // that follows is what actually sets the first direction
+            // (handled in update()/touchmove), not this tap itself.
+            if (ouroborosWaiting && !ouroborosOverlayDismissed) {
+                const now = new Date().getTime();
+                const tapLength = now - ouroborosLastTap;
+
+                if (tapLength < doubleTapDelay && tapLength > 0) {
+                    ouroborosOverlayDismissed = true;
+                    hideOuroborosOverlay();
+                }
+                ouroborosLastTap = now;
+                return;
+            }
 
             // Double-tap to restart
             if (!gameRunning) {
