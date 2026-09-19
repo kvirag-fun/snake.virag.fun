@@ -116,10 +116,20 @@
             letter-spacing: normal;
         }
 
-        /* Always visible - hollow/muted when no life is banked (like an
-           empty container waiting to be filled), solid and colored once
-           Ouroboros banks one. A second heart slot (see .extra-life-slot)
-           sits next to this one for a future second life source. */
+        /* Groups the two heart slots with a tighter gap than the rest of
+           the .hud row, so the pair reads as one unit rather than being
+           spaced out like Level/Score. */
+        .extra-life-group {
+            display: flex;
+            align-items: center;
+            gap: 0.1rem;
+        }
+
+        /* Shared by both heart slots - always visible, hollow/muted when
+           that life isn't banked (like an empty container waiting to be
+           filled), solid and colored once it is. The first is Ouroboros's,
+           the second the Basilisk's - two independent free-life sources,
+           each usable once per run. */
         .extra-life {
             font-size: 42px;
             line-height: 1;
@@ -130,16 +140,6 @@
         .extra-life.extra-life--filled {
             color: var(--markup);
             opacity: 1;
-        }
-
-        /* A second, always-hollow heart slot - not wired to any mechanic
-           yet, just reserving its place in the header now so adding a
-           second life source later doesn't need a layout change. */
-        .extra-life-slot {
-            font-size: 42px;
-            line-height: 1;
-            color: var(--muted-foreground);
-            opacity: 0.5;
         }
 
         main.layout {
@@ -593,8 +593,10 @@
         <div class="hud">
             <span>Level <strong id="level">1</strong></span>
             <span>Score <strong id="score">0</strong></span>
-            <span id="extraLifeIndicator" class="extra-life" title="No free life banked yet - biting your own tail tip earns one">&#9825;</span>
-            <span class="extra-life-slot" title="Reserved for a future second free life" aria-hidden="true">&#9825;</span>
+            <div class="extra-life-group">
+                <span id="extraLifeIndicator" class="extra-life" title="No free life banked yet - biting your own tail tip earns one">&#9825;</span>
+                <span id="basiliskLifeIndicator" class="extra-life" title="No free life banked yet - outgazing the Basilisk earns one">&#9825;</span>
+            </div>
         </div>
         <button type="button" id="infoButton" class="info-button" aria-label="Controls and rules" aria-haspopup="dialog">i</button>
     </header>
@@ -788,6 +790,7 @@
         const specialOverlayTitleElement = document.getElementById('specialOverlayTitle');
         const specialOverlayBonusElement = document.getElementById('specialOverlayBonus');
         const extraLifeIndicatorElement = document.getElementById('extraLifeIndicator');
+        const basiliskLifeIndicatorElement = document.getElementById('basiliskLifeIndicator');
         const respawnMessageElement = document.getElementById('respawnMessage');
         const soundToggle = document.getElementById('soundToggle');
         const difficultySelect = document.getElementById('difficultySelect');
@@ -978,6 +981,12 @@
         // instantly. A forgiven death does the same thing from the
         // board's center.
         let ouroborosLifeAvailable = false;
+        // A second, independent free life banked by outgazing the
+        // Basilisk (see triggerBasiliskSurvived()) - handleDeath() spends
+        // ouroborosLifeAvailable first if both happen to be banked at
+        // once, then this one. Each is usable once per run, so a single
+        // run can bank and spend up to two forgiven deaths total.
+        let basiliskLifeAvailable = false;
         // How many more tiles the snake still needs to regrow (one per
         // move, see update()) after an Ouroboros collapse or a forgiven
         // death's respawn.
@@ -1634,12 +1643,17 @@
             beginSpecialEvent('ouroboros', 'Ouroboros Unlocked!', '+500');
         }
 
-        // Consumes the Ouroboros life if one is banked (forgiving this
-        // death and respawning at the same length instead); otherwise
-        // this death is real.
+        // Consumes a banked free life if one is available - Ouroboros's
+        // first if both happen to be banked at once, otherwise the
+        // Basilisk's - forgiving this death and respawning at the same
+        // length instead; otherwise this death is real.
         function handleDeath(cause) {
             if (ouroborosLifeAvailable) {
                 ouroborosLifeAvailable = false;
+                updateExtraLifeIndicator();
+                respawnWithSameLength();
+            } else if (basiliskLifeAvailable) {
+                basiliskLifeAvailable = false;
                 updateExtraLifeIndicator();
                 respawnWithSameLength();
             } else {
@@ -1680,6 +1694,12 @@
             extraLifeIndicatorElement.title = ouroborosLifeAvailable
                 ? 'Free life banked - your next death respawns you instead of ending the run'
                 : 'No free life banked yet - biting your own tail tip earns one';
+
+            basiliskLifeIndicatorElement.classList.toggle('extra-life--filled', basiliskLifeAvailable);
+            basiliskLifeIndicatorElement.textContent = basiliskLifeAvailable ? '♥' : '♡';
+            basiliskLifeIndicatorElement.title = basiliskLifeAvailable
+                ? 'Free life banked - your next death respawns you instead of ending the run'
+                : 'No free life banked yet - outgazing the Basilisk earns one';
         }
 
         // Jörmungandr easter egg: growing the snake to JORMUNGANDR_LENGTH
@@ -1785,6 +1805,12 @@
             regrowPending = snake.length - 1;
             snake = [{x: snake[0].x, y: snake[0].y}];
 
+            // Its own free life, independent of Ouroboros's - see
+            // handleDeath() for how the two interact when both are
+            // banked at once.
+            basiliskLifeAvailable = true;
+            updateExtraLifeIndicator();
+
             score += 750;
             scoreElement.textContent = score;
 
@@ -1877,6 +1903,7 @@
             ouroborosTriggered = false;
             jormungandrTriggered = false;
             ouroborosLifeAvailable = false;
+            basiliskLifeAvailable = false;
             regrowPending = 0;
             basiliskTriggered = false;
             basiliskActive = false;

@@ -51,8 +51,10 @@ can earn all three.
   "Saved by Ouroboros!" message and no pause. Either way, once you swipe
   again the snake regrows back out to its old length one tile per move
   (`regrowPending`, see `update()`) instead of snapping back instantly.
-  The banked life shows as a heart next to the score - a hollow outline
-  when nothing's banked, filled in once it is. Kept length-preserving
+  The banked life shows as the first of two hearts next to the score -
+  a hollow outline when nothing's banked, filled in once it is (the
+  second is the Basilisk's own, see below - `handleDeath()` spends this
+  one first if both happen to be banked at once). Kept length-preserving
   (rather than a permanent shrink or reset) so reaching Jörmungandr
   afterward stays consecutive instead of forcing a rebuild from scratch
   - the actual risk is choosing to bite your tail at all (or having it
@@ -60,10 +62,10 @@ can earn all three.
   bonus only affects the score shown/submitted, not the level/speed
   pacing (that's driven by a separate `pacingScore` that excludes it) -
   see `triggerOuroboros()`/`handleDeath()`/`respawnWithSameLength()` in
-  `index.html`. Only fires once per run (so there's only ever one free
-  life to spend); any other self-collision, or any death after the life
-  is already spent, is a normal death. Leaderboard entries that
-  triggered it get a ♾️ badge next to the score.
+  `index.html`. Only fires once per run (so there's only ever one of
+  *this* free life to spend); any other self-collision, or any death
+  after both lives are spent, is a normal death. Leaderboard entries
+  that triggered it get a ♾️ badge next to the score.
 - **Basilisk**: appears the instant you swipe to resume after
   Ouroboros's own pause, gazing a wall out to the board edge in exactly
   the direction of that swipe - never some unrelated random direction,
@@ -85,17 +87,21 @@ can earn all three.
   actually can't enter. Touching any tile of the wall, including its head, is its own death
   cause - "You gazed into the Basilisk's eyes," with a game-over screen
   showing the snake turned to stone (same art as the other game-over
-  screens, just recolored gray) - still forgiven by a banked Ouroboros
-  life, same as any other death. The wall stays up until 15 apples have been eaten since
+  screens, just recolored gray) - still forgiven by a banked free life
+  (either one), same as any other death. The wall stays up until 15 apples have been eaten since
   it spawned (`BASILISK_FOOD_COUNT`) - not 15 raw moves, so circling in
   place can't clear it for free, you have to actually keep playing.
   Surviving to see it clear is the achievement: same pause/rays
   treatment as Ouroboros, right down to collapsing to a single tile and
-  regrowing back out one tile per move once play resumes (`regrowPending`)
-  - +750, 🗿 badge, deliberately doesn't change the snake's body color
-  (see below) - the one permanent trace it leaves is the snake's own
-  eyes turning the same dark purple as the Basilisk's, for the rest of
-  the run. Only ever spawns once per run.
+  regrowing back out one tile per move once play resumes (`regrowPending`),
+  and banking its own **free life** - the second heart next to the score,
+  independent of Ouroboros's own (both can be banked at once; a death
+  spends Ouroboros's first - see `handleDeath()`) - +750, 🗿 badge,
+  deliberately doesn't change the snake's body color (see below) - the
+  one permanent trace it leaves is the snake's own eyes turning the
+  same dark purple as the Basilisk's, for the rest of the run. Only
+  ever spawns once per run (so there's only ever one of *this* free
+  life to spend, same as Ouroboros's own).
 - **Jörmungandr**: growing the snake to 80 segments (`JORMUNGANDR_LENGTH`
   in `index.html`) triggers it - but only once the Basilisk has been
   outgazed this run, and even then only re-checked on your next actual
