@@ -930,11 +930,18 @@
         // (20% of the 20x20 board) once confirmed working.
         const JORMUNGANDR_LENGTH = 15;
 
-        // Ouroboros no longer shrinks the snake - it banks a free life
-        // instead (see triggerOuroboros()/handleDeath()/
-        // respawnWithSameLength() below), forgiving whatever kills the
-        // run next by respawning at the same length rather than ending it.
+        // Ouroboros no longer shrinks the snake permanently - it collapses
+        // to a single tile at the point of the bite, banks a free life
+        // (see triggerOuroboros()/handleDeath()/respawnWithSameLength()
+        // below), and regrows one tile per move (regrowPending) back out
+        // to its old length once play resumes, instead of snapping back
+        // instantly. A forgiven death does the same thing from the
+        // board's center.
         let ouroborosLifeAvailable = false;
+        // How many more tiles the snake still needs to regrow (one per
+        // move, see update()) after an Ouroboros collapse or a forgiven
+        // death's respawn.
+        let regrowPending = 0;
         // True while the post-respawn "pick a direction" message is up -
         // cleared the moment a real direction arrives, same idea as the
         // special-event overlays but without blocking movement or needing
@@ -1436,26 +1443,32 @@
 
                 // Play sound
                 playSoundEffect('foodEatingSound');
-                
+
                 score += 10;
                 pacingScore += 10;
                 scoreElement.textContent = score;
                 updateLevelDisplay(pacingScore);
 
                 gameSpeed = getGameSpeed(pacingScore);
-                
+
                 randomFood();
                 randomBadFood();
 
-                // Jörmungandr: growing long enough is its own easter egg,
-                // independent of Ouroboros and in either order - see
-                // triggerJormungandr() below.
-                if (!jormungandrTriggered && snake.length >= JORMUNGANDR_LENGTH) {
-                    triggerJormungandr();
-                }
-
+            } else if (regrowPending > 0) {
+                // Regrowing one tile per move after an Ouroboros collapse
+                // or a forgiven death's respawn - don't pop the tail until
+                // back to the old length.
+                regrowPending--;
             } else {
                 snake.pop();
+            }
+
+            // Jörmungandr: growing long enough is its own easter egg,
+            // independent of Ouroboros and in either order, and whether
+            // the growth just came from food or from regrowing after an
+            // Ouroboros collapse - see triggerJormungandr() below.
+            if (!jormungandrTriggered && snake.length >= JORMUNGANDR_LENGTH) {
+                triggerJormungandr();
             }
         }
 
@@ -1473,6 +1486,13 @@
             ouroborosLifeAvailable = true;
             snakeColorMode = 'ouroboros';
             updateExtraLifeIndicator();
+
+            // Collapse to a single tile at the point of the bite - the
+            // snake regrows it one tile per move (see regrowPending in
+            // update()) once the player swipes again, instead of snapping
+            // back to its old length instantly.
+            regrowPending = snake.length - 1;
+            snake = [{x: snake[0].x, y: snake[0].y}];
 
             // Only score (shown/submitted) gets the bonus - pacingScore
             // is untouched, so level and game speed don't jump too.
@@ -1495,37 +1515,17 @@
             }
         }
 
-        // Lays a snake of `length` cells out as a boustrophedon (back-
-        // and-forth) fill starting at the board's center - a straight
-        // line can't hold a long snake on a 20x20 board (Jörmungandr's
-        // own threshold alone needs 4 board-widths), but this fill can
-        // hold up to the entire board. Returns head-first (index 0 =
-        // the fill's outermost point), matching the snake array's
-        // convention elsewhere.
-        function buildRespawnPath(length) {
+        // Respawns at the board's center - the same point the snake
+        // starts a fresh game from (see the initial `snake` above) - as a
+        // single tile, regrowing back out to its pre-death length one
+        // tile per move (see regrowPending in update()) once the player
+        // swipes again, instead of snapping back to its old length
+        // instantly.
+        function respawnWithSameLength() {
             const startX = Math.floor(tileCount / 2);
             const startY = Math.floor(tileCount / 2);
-            const path = [{x: startX, y: startY}];
-            let x = startX, y = startY, stepX = 1;
-            while (path.length < length) {
-                const nextX = x + stepX;
-                if (nextX < 0 || nextX >= tileCount) {
-                    // Wrap (not just increment) so a snake long enough to
-                    // need every row can still fit: starting at the
-                    // center row and wrapping cycles through all
-                    // tileCount rows before it would ever run out.
-                    y = (y + 1) % tileCount;
-                    stepX = -stepX;
-                } else {
-                    x = nextX;
-                    path.push({x, y});
-                }
-            }
-            return path.reverse();
-        }
-
-        function respawnWithSameLength() {
-            snake = buildRespawnPath(snake.length);
+            regrowPending = snake.length - 1;
+            snake = [{x: startX, y: startY}];
             dx = 0;
             dy = 0;
             inputQueue = [];
@@ -1556,6 +1556,10 @@
         function triggerJormungandr() {
             const headPos = snake[0];
             snake = [{x: headPos.x, y: headPos.y}];
+            // If this fired mid-regrow (growing back out after an
+            // Ouroboros collapse or a forgiven death), that old target
+            // length is moot now - Jörmungandr's own shrink-to-1 wins.
+            regrowPending = 0;
             jormungandrTriggered = true;
             snakeColorMode = 'jormungandr';
 
@@ -1651,6 +1655,7 @@
             ouroborosTriggered = false;
             jormungandrTriggered = false;
             ouroborosLifeAvailable = false;
+            regrowPending = 0;
             updateExtraLifeIndicator();
             snakeColorMode = 'normal';
             specialEventKind = null;

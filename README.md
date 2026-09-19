@@ -20,34 +20,40 @@ installable as a PWA. Live at
   hitting one ends the run just like hitting a wall.
 - **Ouroboros easter egg**: biting your own tail tip (not any other
   self-collision) the first time in a run doesn't kill you - the snake
-  keeps its full length, +500 score, pauses (golden rays, double-tap or
-  `R` to dismiss) until your next move, turns gold, and banks a **free
-  life**: whatever kills the run next (wall, self-collision, rotten
-  apple - any cause) is forgiven instead of ending it, respawning the
-  snake at the board's center at the *same length* it just had (laid
-  out as a back-and-forth fill, since a straight line can't hold a long
-  snake on a 20x20 board - see `buildRespawnPath()`), with a brief
-  "Saved by Ouroboros!" message and no pause. A banked life shows as
-  ❤️ FREE LIFE next to the score. Deliberately kept length-preserving
-  rather than a reset, so reaching Jörmungandr afterward stays
-  consecutive instead of forcing a rebuild from scratch - the actual
-  risk is choosing to bite your tail at all (or having it happen by
-  accident) rather than losing progress from doing so. The bonus only
-  affects the score shown/submitted, not the level/speed pacing (that's
-  driven by a separate `pacingScore` that excludes it) - see
-  `triggerOuroboros()`/`handleDeath()`/`respawnWithSameLength()` in
-  `index.html`. Only fires once per run (so there's only ever one free
-  life to spend); any other self-collision, or any death after the life
-  is already spent, is a normal death. Leaderboard entries that
-  triggered it get a ♾️ badge next to the score.
+  collapses to a single tile at the point of the bite, +500 score,
+  pauses (golden rays, double-tap or `R` to dismiss) until your next
+  move, turns gold, and banks a **free life**: whatever kills the run
+  next (wall, self-collision, rotten apple - any cause) is forgiven
+  instead of ending it, respawning the snake as a single tile at the
+  board's center - the same point a fresh game starts from - with a
+  brief "Saved by Ouroboros!" message and no pause. Either way, once you
+  swipe again the snake regrows back out to its old length one tile per
+  move (`regrowPending`, see `update()`) instead of snapping back
+  instantly. The banked life shows as a heart next to the score - a
+  hollow outline when nothing's banked, filled in once it is. Kept
+  length-preserving (rather than a permanent shrink or reset) so
+  reaching Jörmungandr afterward stays consecutive instead of forcing a
+  rebuild from scratch - the actual risk is choosing to bite your tail
+  at all (or having it happen by accident) rather than losing progress
+  from doing so. The bonus only affects the score shown/submitted, not
+  the level/speed pacing (that's driven by a separate `pacingScore` that
+  excludes it) - see `triggerOuroboros()`/`handleDeath()`/
+  `respawnWithSameLength()` in `index.html`. Only fires once per run (so
+  there's only ever one free life to spend); any other self-collision,
+  or any death after the life is already spent, is a normal death.
+  Leaderboard entries that triggered it get a ♾️ badge next to the
+  score.
 - **Jörmungandr easter egg**: growing the snake to 80 segments (`JORMUNGANDR_LENGTH`
   in `index.html`) triggers independently of Ouroboros - either can happen
   first, neither requires the other, both can happen in the same run
   (and Ouroboros's free life, if still banked, carries through Jörmungandr
-  triggering unaffected). Unlike Ouroboros, this one does shrink to 1
-  square - pause/rays/color otherwise the same treatment, just teal
-  instead of gold and +1000 instead of +500. A run with both fires shows
-  both badges (♾️🐉). Whichever of the two events fires later wins the
+  triggering unaffected - only Ouroboros's own regrow-to-old-length
+  target is cancelled if Jörmungandr fires while a regrow is still in
+  progress, since its own shrink-to-1 wins). Unlike Ouroboros, this one
+  does shrink to 1 square and stays there - no regrow - pause/rays/color
+  otherwise the same treatment, just teal instead of gold and +1000
+  instead of +500. A run with both fires shows both badges (♾️🐉).
+  Whichever of the two events fires later wins the
   snake's color for the rest of the run.
 - **Installable PWA** (`vite-plugin-pwa`, auto-updating service worker) -
   a from-scratch pixel-art "S" icon built from the game's own in-game
