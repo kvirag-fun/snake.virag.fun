@@ -1552,11 +1552,14 @@
                 lastUpdateTime = time;  // Reset timer
             }
 
-            if (needsRedraw) {
+            // The Ouroboros rays rotate against the clock, not the game's
+            // own tick rate - redraw every frame while they're up so the
+            // rotation is smooth instead of stepping once per game tick.
+            if (needsRedraw || ouroborosWaiting) {
                 drawGame();
                 needsRedraw = false;
             }
-            
+
             requestAnimationFrame(gameLoop);
         }
 
