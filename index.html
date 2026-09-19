@@ -667,6 +667,19 @@
         const soundToggle = document.getElementById('soundToggle');
         const difficultySelect = document.getElementById('difficultySelect');
 
+        // Re-triggering one shared <audio> element (resetting currentTime
+        // and calling play() again) races with itself when it fires again
+        // before the previous play has settled - eating food twice in
+        // quick succession is exactly that, and the browser can reject
+        // the second play() with an AbortError, silently, mid-clip. A
+        // fresh clone per trigger has its own independent playback state,
+        // so overlapping triggers can't collide.
+        function playSoundEffect(elementId) {
+            if (!soundToggle.checked) return;
+            const clone = document.getElementById(elementId).cloneNode(true);
+            clone.play().catch(e => console.log('Sound play failed:', e));
+        }
+
         difficultySelect.addEventListener('change', function() {
             if (!gameRunning) {
                 this.blur();
@@ -1161,11 +1174,7 @@
             if (head.x === food.x && head.y === food.y) {
 
                 // Play sound
-                if (soundToggle.checked) {
-                    const gameOverSound = document.getElementById('foodEatingSound');
-                    gameOverSound.currentTime = 0;  // Reset to start
-                    gameOverSound.play().catch(e => console.log('Sound play failed:', e));
-                }
+                playSoundEffect('foodEatingSound');
                 
                 score += 10;
                 scoreElement.textContent = score;
@@ -1232,11 +1241,7 @@
             toggleDifficultySelector();
 
             // Play sound
-            if (soundToggle.checked) {
-                const gameOverSound = document.getElementById('gameOverSound');
-                gameOverSound.currentTime = 0;  // Reset to start
-                gameOverSound.play().catch(e => console.log('Sound play failed:', e));
-            }
+            playSoundEffect('gameOverSound');
         }
 
         // Restart game
