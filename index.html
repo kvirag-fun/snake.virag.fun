@@ -115,6 +115,20 @@
             letter-spacing: normal;
         }
 
+        /* Always visible - hollow/muted when no life is banked (like an
+           empty container waiting to be filled), solid and colored once
+           Ouroboros banks one. */
+        .extra-life {
+            font-size: 14px;
+            color: var(--muted-foreground);
+            opacity: 0.5;
+        }
+
+        .extra-life.extra-life--filled {
+            color: var(--markup);
+            opacity: 1;
+        }
+
         main.layout {
             width: 100%;
             max-width: 400px;
@@ -445,6 +459,24 @@
             opacity: 0.85;
         }
 
+        /* Light-touch equivalent shown after the banked Ouroboros life is
+           actually spent - no pause, no rays, just a quick "here's what
+           happened" that clears itself the moment you move. */
+        .respawn-message {
+            position: absolute;
+            top: 20px;
+            left: 10px;
+            right: 10px;
+            text-align: center;
+            font-family: var(--font-mono);
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--markup);
+            text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85), 0 0 6px rgba(0, 0, 0, 0.6);
+            pointer-events: none;
+        }
+
         /* Same reasoning as body.playing above - only disable native touch
            gestures over the leaderboard/settings row while a run is
            actually in progress (so a swipe starting there still steers,
@@ -544,6 +576,7 @@
         <div class="hud">
             <span>Level <strong id="level">1</strong></span>
             <span>Score <strong id="score">0</strong></span>
+            <span id="extraLifeIndicator" class="extra-life" title="No free life banked yet - biting your own tail tip earns one">&#9825;</span>
         </div>
         <button type="button" id="infoButton" class="info-button" aria-label="Controls and rules" aria-haspopup="dialog">i</button>
     </header>
@@ -587,6 +620,7 @@
                 <div class="special-bonus" id="specialOverlayBonus"></div>
                 <div class="special-continue-hint">Double-tap or press R to continue.</div>
             </div>
+            <div id="respawnMessage" class="respawn-message" hidden>Saved by Ouroboros! Choose a direction.</div>
         </div>
     </main>
 
@@ -728,6 +762,8 @@
         const specialOverlayElement = document.getElementById('specialOverlay');
         const specialOverlayTitleElement = document.getElementById('specialOverlayTitle');
         const specialOverlayBonusElement = document.getElementById('specialOverlayBonus');
+        const extraLifeIndicatorElement = document.getElementById('extraLifeIndicator');
+        const respawnMessageElement = document.getElementById('respawnMessage');
         const soundToggle = document.getElementById('soundToggle');
         const difficultySelect = document.getElementById('difficultySelect');
 
@@ -890,7 +926,21 @@
         // which bails out early whenever a wait is already in progress.
         let ouroborosTriggered = false;
         let jormungandrTriggered = false;
-        const JORMUNGANDR_LENGTH = 80;
+        // TEMPORARY for testing the "free life" rework - reinstate 80
+        // (20% of the 20x20 board) once confirmed working.
+        const JORMUNGANDR_LENGTH = 15;
+
+        // Ouroboros no longer shrinks the snake - it banks a free life
+        // instead (see triggerOuroboros()/handleDeath()/
+        // respawnWithSameLength() below), forgiving whatever kills the
+        // run next by respawning at the same length rather than ending it.
+        let ouroborosLifeAvailable = false;
+        // True while the post-respawn "pick a direction" message is up -
+        // cleared the moment a real direction arrives, same idea as the
+        // special-event overlays but without blocking movement or needing
+        // a double-tap (there's nothing left to protect against - the
+        // life is already spent).
+        let respawnMessageShowing = false;
 
         // Which snake color to draw - sticks after whichever fired most
         // recently (if a game gets both, the later one's color wins).
@@ -1336,26 +1386,33 @@
                 specialEventKind = null;
             }
 
+            if (respawnMessageShowing) {
+                respawnMessageShowing = false;
+                respawnMessageElement.hidden = true;
+            }
+
             const head = {x: snake[0].x + nextDx, y: snake[0].y + nextDy};
 
             // Check wall collision
             if (head.x < 0 || head.x >= tileCount || head.y < 0 || head.y >= tileCount) {
-                gameOver('wall');
+                handleDeath('wall');
                 return;
             }
 
             // Check self collision - Ouroboros only fires for the true
             // myth (biting your own tail TIP), not any other body
-            // segment. Hitting a corner or a middle segment is a normal
-            // death, same as it always was, even on the first collision.
+            // segment, and only the first time (it doesn't shrink you
+            // anymore, so biting it again later is just a normal death,
+            // same as any other self-collision - unless a free life from
+            // an earlier Ouroboros is still banked, same as any death).
             for (let i = 0; i < snake.length; i++) {
                 const segment = snake[i];
                 if (head.x === segment.x && head.y === segment.y) {
                     const isTailTip = i === snake.length - 1;
                     if (!ouroborosTriggered && isTailTip) {
-                        triggerOuroboros(head);
+                        triggerOuroboros();
                     } else {
-                        gameOver('self');
+                        handleDeath('self');
                     }
                     return;
                 }
@@ -1364,7 +1421,7 @@
             // Check bad food collision
             for (const badFood of badFoodList) {
                 if (head.x === badFood.x && head.y === badFood.y) {
-                    gameOver('rotten');
+                    handleDeath('rotten');
                     return;
                 }
             }
@@ -1403,16 +1460,19 @@
         }
 
         // Ouroboros easter egg: biting your own tail the first time in a
-        // run doesn't kill you - the snake permanently shrinks to a single
-        // square at the point the loop closed, and the run continues from
-        // there (growing again only by eating food, same as a fresh run).
-        // A deliberate strategy, not just a one-off bonus: worth reaching
-        // for once the snake gets unwieldy at a harder speed tier. Only
-        // fires once per game; any later self-collision is a normal death.
-        function triggerOuroboros(head) {
-            snake = [{x: head.x, y: head.y}];
+        // run doesn't kill you - the length is kept (that's the whole
+        // point: it stays consecutive with reaching Jörmungandr, rather
+        // than forcing a rebuild from scratch), +500, and it banks a free
+        // life (see ouroborosLifeAvailable/handleDeath/respawnWithSameLength
+        // below) that forgives whatever kills you next. A deliberate risk
+        // to take on purpose once you're already big, not just a bonus.
+        // Only fires once per game; any later self-collision is a normal
+        // death (or forgiven by the banked life, same as any other death).
+        function triggerOuroboros() {
             ouroborosTriggered = true;
+            ouroborosLifeAvailable = true;
             snakeColorMode = 'ouroboros';
+            updateExtraLifeIndicator();
 
             // Only score (shown/submitted) gets the bonus - pacingScore
             // is untouched, so level and game speed don't jump too.
@@ -1420,6 +1480,73 @@
             scoreElement.textContent = score;
 
             beginSpecialEvent('ouroboros', 'Ouroboros Unlocked!', '+500');
+        }
+
+        // Consumes the Ouroboros life if one is banked (forgiving this
+        // death and respawning at the same length instead); otherwise
+        // this death is real.
+        function handleDeath(cause) {
+            if (ouroborosLifeAvailable) {
+                ouroborosLifeAvailable = false;
+                updateExtraLifeIndicator();
+                respawnWithSameLength();
+            } else {
+                gameOver(cause);
+            }
+        }
+
+        // Lays a snake of `length` cells out as a boustrophedon (back-
+        // and-forth) fill starting at the board's center - a straight
+        // line can't hold a long snake on a 20x20 board (Jörmungandr's
+        // own threshold alone needs 4 board-widths), but this fill can
+        // hold up to the entire board. Returns head-first (index 0 =
+        // the fill's outermost point), matching the snake array's
+        // convention elsewhere.
+        function buildRespawnPath(length) {
+            const startX = Math.floor(tileCount / 2);
+            const startY = Math.floor(tileCount / 2);
+            const path = [{x: startX, y: startY}];
+            let x = startX, y = startY, stepX = 1;
+            while (path.length < length) {
+                const nextX = x + stepX;
+                if (nextX < 0 || nextX >= tileCount) {
+                    // Wrap (not just increment) so a snake long enough to
+                    // need every row can still fit: starting at the
+                    // center row and wrapping cycles through all
+                    // tileCount rows before it would ever run out.
+                    y = (y + 1) % tileCount;
+                    stepX = -stepX;
+                } else {
+                    x = nextX;
+                    path.push({x, y});
+                }
+            }
+            return path.reverse();
+        }
+
+        function respawnWithSameLength() {
+            snake = buildRespawnPath(snake.length);
+            dx = 0;
+            dy = 0;
+            inputQueue = [];
+
+            // The new body occupies a very different part of the board -
+            // re-roll food/bad food so they can't already be sitting
+            // under it.
+            badFoodList = [];
+            randomFood();
+            randomBadFood();
+
+            respawnMessageShowing = true;
+            respawnMessageElement.hidden = false;
+        }
+
+        function updateExtraLifeIndicator() {
+            extraLifeIndicatorElement.classList.toggle('extra-life--filled', ouroborosLifeAvailable);
+            extraLifeIndicatorElement.textContent = ouroborosLifeAvailable ? '♥' : '♡';
+            extraLifeIndicatorElement.title = ouroborosLifeAvailable
+                ? 'Free life banked - your next death respawns you instead of ending the run'
+                : 'No free life banked yet - biting your own tail tip earns one';
         }
 
         // Jörmungandr easter egg: growing the snake to JORMUNGANDR_LENGTH
@@ -1523,11 +1650,15 @@
 
             ouroborosTriggered = false;
             jormungandrTriggered = false;
+            ouroborosLifeAvailable = false;
+            updateExtraLifeIndicator();
             snakeColorMode = 'normal';
             specialEventKind = null;
             specialEventWaiting = false;
             specialEventOverlayDismissed = false;
             hideSpecialOverlay();
+            respawnMessageShowing = false;
+            respawnMessageElement.hidden = true;
 
             if (splashLoaded) {
                 splashLoaded = false
