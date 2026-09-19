@@ -14,12 +14,12 @@ service cloud.firestore {
         && request.resource.data.score is int
         && request.resource.data.score >= 0
         // 20x20 board, +10 per food - max possible run is well under 4000,
-        // plus the one-time +500 Ouroboros, +1000 Jörmungandr and +1500
+        // plus the one-time +500 Ouroboros, +1000 Jörmungandr and +750
         // Basilisk bonuses (see index.html), which a single run can get
         // all three of (Jörmungandr and the Basilisk both require
         // Ouroboros to have fired first, but are independent of each
         // other after that).
-        && request.resource.data.score <= 7500
+        && request.resource.data.score <= 6750
         // Optional nickname, entered client-side when a run actually
         // qualifies for the top 5. This is a charset/length guard only -
         // profanity filtering happens client-side (see index.html) since

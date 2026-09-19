@@ -81,13 +81,15 @@ a single run can earn all three.
   - it picks one of its two component directions 50/50 - so the wall is
   always a straight line, and (deliberately) never originates at the
   center itself, which is where a forgiven death always respawns.
-  Touching any tile of the wall, including its head, is a death like
-  any wall (a banked Ouroboros life still forgives it, same as any
-  other death). The wall stays up until 15 apples have been eaten since
+  Touching any tile of the wall, including its head, is its own death
+  cause - "You gazed into the Basilisk's eyes," with a game-over screen
+  showing the snake turned to stone (same art as the other game-over
+  screens, just recolored gray) - still forgiven by a banked Ouroboros
+  life, same as any other death. The wall stays up until 15 apples have been eaten since
   it spawned (`BASILISK_FOOD_COUNT`) - not 15 raw moves, so circling in
   place can't clear it for free, you have to actually keep playing.
   Surviving to see it clear is the achievement: same pause/rays
-  treatment, +1500, stone gray, 🗿 badge. Only ever spawns once per run.
+  treatment, +750, stone gray, 🗿 badge. Only ever spawns once per run.
 
 Whichever of the three fired most recently wins the snake's color for
 the rest of the run, and a run that earns more than one shows all of
@@ -175,5 +177,5 @@ and connects to the emulator instead of production.
 | `public/tab_icon.ico` | Favicon (no-gap pixel-art render, no eye detail - aliases into noise at 16-32px otherwise) |
 | `public/icon-192.png`, `public/icon-512.png`, `public/apple-touch-icon.png` | PWA/home-screen icons (segmented pixel-art render, with head/eye detail) |
 | `public/snake_splash_screen.png` | Splash screen shown before a run starts |
-| `public/snake_gameover_wall.png`, `public/snake_gameover_self.png`, `public/snake_gameover_rotten.png` | Game-over screens, one per death cause |
+| `public/snake_gameover_wall.png`, `public/snake_gameover_self.png`, `public/snake_gameover_rotten.png`, `public/snake_gameover_gaze.png` | Game-over screens, one per death cause (`gaze`'s snake is the same art, recolored stone-gray) |
 | `public/food.mp3`, `public/ugh_05s.mp3` | Sound effects (eating food, game over) |

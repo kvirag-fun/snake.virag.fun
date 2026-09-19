@@ -999,6 +999,7 @@
             wall: 'snake_gameover_wall.png',
             self: 'snake_gameover_self.png',
             rotten: 'snake_gameover_rotten.png',
+            gaze: 'snake_gameover_gaze.png',
         };
         const gameOverImages = {};
         const gameOverLoaded = {};
@@ -1014,13 +1015,14 @@
             gameOverImages[cause] = image;
         }
 
-        // Distinguishes the 3 ways a run can end - set by gameOver(), read
+        // Distinguishes the 4 ways a run can end - set by gameOver(), read
         // by drawGame() (which image/message to show) and restart() (cleared
         // for the next run).
         const DEATH_MESSAGES = {
             wall: 'You ran into a wall.',
             self: 'You ran into yourself.',
             rotten: 'You ate a rotten apple.',
+            gaze: 'You gazed into the Basilisk\'s eyes.',
         };
         let deathCause = null;
 
@@ -1475,12 +1477,14 @@
                 return;
             }
 
-            // Check the Basilisk's gaze wall, if one is currently up -
-            // same treatment as the board's own edge.
+            // Check the Basilisk's gaze wall, if one is currently up - its
+            // own death cause (forgiven by a banked Ouroboros life the
+            // same as any other death), not lumped in with the board's
+            // own edge.
             if (basiliskActive) {
                 for (const seg of basiliskWall) {
                     if (head.x === seg.x && head.y === seg.y) {
-                        handleDeath('wall');
+                        handleDeath('gaze');
                         return;
                     }
                 }
@@ -1733,10 +1737,10 @@
             basiliskTriggered = true;
             snakeColorMode = 'basilisk';
 
-            score += 1500;
+            score += 750;
             scoreElement.textContent = score;
 
-            beginSpecialEvent('basilisk', 'Basilisk Outgazed!', '+1500');
+            beginSpecialEvent('basilisk', 'Basilisk Outgazed!', '+750');
         }
 
         function beginSpecialEvent(kind, title, bonus) {
