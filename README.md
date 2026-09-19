@@ -45,11 +45,11 @@ can earn all three.
   collapses to a single tile at the point of the bite, pauses (golden
   rays, double-tap or `R` to dismiss) until your next move, turns gold,
   and scores a bonus that scales with how long the snake was at the
-  bite: +5 at the smallest possible loop (4 segments - the geometric
+  bite: +40 at the smallest possible loop (4 segments - the geometric
   floor for the head to even reach its own tail tip) up to +400 once
-  you're 40+ segments long (`OUROBOROS_MIN_LENGTH`/
-  `OUROBOROS_FULL_BONUS_LENGTH`/`OUROBOROS_MIN_BONUS`/
-  `OUROBOROS_MAX_BONUS` in `index.html`, rounded to the nearest 5) -
+  you're 40+ segments long - a clean +10 per segment in between
+  (`OUROBOROS_MIN_LENGTH`/`OUROBOROS_FULL_BONUS_LENGTH`/
+  `OUROBOROS_MIN_BONUS`/`OUROBOROS_MAX_BONUS` in `index.html`) -
   deliberately discourages triggering it the instant it's geometrically
   possible just to breeze through the easiest, slowest part of a run;
   the reward only matches the myth once you've actually risked

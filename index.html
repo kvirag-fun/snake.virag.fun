@@ -968,11 +968,12 @@
         // Ouroboros can be triggered at any length (4 is the theoretical
         // floor - the smallest loop where the head can even reach its own
         // tail tip), but the bonus scales with how big you were when you
-        // took the bite: barely worth it at the bare minimum, full value
-        // once you've risked something real. See triggerOuroboros().
+        // took the bite: +40 at the bare minimum, up to +400 once you've
+        // risked something real (40+ segments) - a clean +10 per segment
+        // in between. See triggerOuroboros().
         const OUROBOROS_MIN_LENGTH = 4;
         const OUROBOROS_FULL_BONUS_LENGTH = 40;
-        const OUROBOROS_MIN_BONUS = 5;
+        const OUROBOROS_MIN_BONUS = 40;
         const OUROBOROS_MAX_BONUS = 400;
 
         // Basilisk easter egg - see spawnBasilisk()/triggerBasiliskSurvived()
