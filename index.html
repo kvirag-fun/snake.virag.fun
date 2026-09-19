@@ -17,8 +17,8 @@
          * virag.fun sites (see cv.virag.fun and ascii.virag.fun, both of
          * which pull these exact tokens from a shared vendor/blueprint-
          * framework git submodule) - copied inline here rather than
-         * pulled in as a submodule, since this repo is deliberately a
-         * single self-contained index.html with no build step.
+         * pulled in as a submodule, to keep the game's markup, styles,
+         * and script together in one file.
          */
         :root {
             --background: oklch(0.972 0.007 92);
@@ -1211,7 +1211,6 @@
         //Get game difficulty
         function getGameDifficulty() {
             const difficultySelect = document.getElementById('difficultySelect');
-            console.log(difficultySelect.value)
             return parseFloat(difficultySelect.value);
         }
         
