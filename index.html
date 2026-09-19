@@ -930,15 +930,16 @@
         let needsRedraw = true;
         let lastUpdateTime = 0
 
-        // Ouroboros, Jörmungandr and the Basilisk - three easter eggs, each
-        // firing once per game, but no longer independent of each other:
-        // Ouroboros is the gate. Without it, this is just Snake - reaching
-        // JORMUNGANDR_LENGTH does nothing, and the Basilisk never appears.
-        // Once Ouroboros fires, Jörmungandr becomes reachable (any time
-        // after, via any growth - food or regrow) and the Basilisk spawns
-        // immediately (see spawnBasilisk() below). All three pause the run
-        // the same way (see specialEvent* below and triggerOuroboros()/
-        // triggerJormungandr()/triggerBasiliskSurvived()), so they share
+        // Ouroboros, the Basilisk and Jörmungandr - three easter eggs, each
+        // firing once per game, in a strict chain rather than independently:
+        // Ouroboros is the gate. Without it, this is just Snake - the
+        // Basilisk never appears, and reaching JORMUNGANDR_LENGTH does
+        // nothing. Once Ouroboros fires, the Basilisk spawns immediately
+        // (see spawnBasilisk() below); only once the Basilisk has been
+        // outgazed does Jörmungandr become reachable (any time after, via
+        // any growth - food or regrow). All three pause the run the same
+        // way (see specialEvent* below and triggerOuroboros()/
+        // triggerBasiliskSurvived()/triggerJormungandr()), so they share
         // one pause/overlay/rays system rather than duplicating it - only
         // one can ever be waiting at a time, since reaching any of them
         // fires from inside update(), which bails out early whenever a
@@ -1394,9 +1395,9 @@
             // fired - gold or teal respectively, whichever fired most
             // recently. Outgazing the Basilisk doesn't change this - gray
             // only ever shows up on its death screen, never on the living
-            // snake, so an unlucky interleaving (e.g. reaching Jörmungandr
-            // mid-Basilisk-countdown, then outgazing it after) can't
-            // overwrite a color you already earned.
+            // snake, so it can never overwrite the gold Ouroboros color you
+            // earn just before it (and, since it also gates Jörmungandr,
+            // is always immediately followed by teal anyway once earned).
             const SNAKE_COLORS = {
                 normal: { body: '#ADDDBB', head: '#32A956' },
                 ouroboros: { body: '#FFD700', head: '#DAA520' },
@@ -1531,7 +1532,8 @@
             dy = nextDy;
             
             // Check food collision
-            if (head.x === food.x && head.y === food.y) {
+            const ateFood = head.x === food.x && head.y === food.y;
+            if (ateFood) {
 
                 // Play sound
                 playSoundEffect('foodEatingSound');
@@ -1561,23 +1563,28 @@
                 snake.pop();
             }
 
-            // Jörmungandr: growing long enough is its own easter egg, but
-            // only reachable once Ouroboros has already fired this run
-            // (see the state comments above) - whether the growth just
-            // came from food or from regrowing after an Ouroboros
-            // collapse - see triggerJormungandr() below.
-            if (ouroborosTriggered && !jormungandrTriggered && snake.length >= JORMUNGANDR_LENGTH) {
-                triggerJormungandr();
-            }
-
             // Basilisk: surviving until BASILISK_FOOD_COUNT apples have
             // been eaten since it spawned is the achievement - the wall
-            // itself doesn't reward anything, only outlasting it does. The
-            // !specialEventWaiting guard defers this a tick in the rare
-            // case Jörmungandr's check just above fired on this exact
-            // move, so the two overlays can't stomp on each other.
+            // itself doesn't reward anything, only outlasting it does.
+            // Checked before Jörmungandr below, since Jörmungandr now
+            // requires this to have already happened.
             if (!specialEventWaiting && basiliskActive && basiliskFoodCounter >= BASILISK_FOOD_COUNT) {
                 triggerBasiliskSurvived();
+            }
+
+            // Jörmungandr: growing long enough is its own easter egg, but
+            // only reachable once the Basilisk has been outgazed this run
+            // (see the state comments above) - re-checked only on an
+            // actual food-eat (ateFood), not every move, so there's
+            // always at least one real "eat an apple" step between the
+            // Basilisk's pause and this one, even if the length threshold
+            // was already crossed (via food or regrow) while the wall was
+            // still up - see triggerJormungandr() below. The
+            // !specialEventWaiting guard defers this a tick if the
+            // Basilisk's own pause just started this exact move (from the
+            // check above), so the two overlays can't stomp on each other.
+            if (ateFood && !specialEventWaiting && basiliskTriggered && !jormungandrTriggered && snake.length >= JORMUNGANDR_LENGTH) {
+                triggerJormungandr();
             }
         }
 
@@ -1660,10 +1667,10 @@
         }
 
         // Jörmungandr easter egg: growing the snake to JORMUNGANDR_LENGTH
-        // segments - but only reachable once Ouroboros has already fired
-        // this run (see the gating comment on ouroborosTriggered above).
-        // Once unlocked it can fire any time after, via any growth - food
-        // or regrow - and also only once per game. Doesn't touch the
+        // segments - but only reachable once the Basilisk has been
+        // outgazed this run (see the gating comment on ouroborosTriggered
+        // above). Once unlocked it can fire any time after, via any
+        // growth - food or regrow - and also only once per game. Doesn't touch the
         // snake's length or position at all (if this fires mid-regrow
         // after an Ouroboros collapse, that regrow just continues
         // unaffected) - same pause treatment, its own color and bonus.

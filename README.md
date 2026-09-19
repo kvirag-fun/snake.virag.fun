@@ -30,12 +30,15 @@ installable as a PWA. Live at
 
 ## Fairytales
 
-Three hidden, mythology-themed easter eggs, each firing once per run.
-Ouroboros is the gate: until it fires, this is just Snake - Jörmungandr
-and the Basilisk are both unreachable. Once Ouroboros fires, the other
-two become available (the Basilisk immediately, Jörmungandr any time
-after via growth) and are independent of each other, in either order -
-a single run can earn all three.
+Three hidden, mythology-themed easter eggs, each firing once per run,
+in a strict chain: Ouroboros → Basilisk → Jörmungandr. Ouroboros is the
+gate - until it fires, this is just Snake. Once it fires, the Basilisk
+spawns immediately; only once the Basilisk has been outgazed does
+Jörmungandr become reachable, and even then only on your next actual
+food-eat (not just your next move) - so there's always a real "eat an
+apple" step between the two, even if you'd already grown past its
+length threshold while the Basilisk's wall was still up. A single run
+can earn all three.
 
 - **Ouroboros**: biting your own tail tip (not any other self-collision)
   the first time in a run doesn't kill you - the snake collapses to a
@@ -61,14 +64,6 @@ a single run can earn all three.
   life to spend); any other self-collision, or any death after the life
   is already spent, is a normal death. Leaderboard entries that
   triggered it get a ♾️ badge next to the score.
-- **Jörmungandr**: growing the snake to 80 segments (`JORMUNGANDR_LENGTH`
-  in `index.html`) triggers it - but only once Ouroboros has already
-  fired this run (Ouroboros's free life, if still banked, carries
-  through unaffected, and so does an in-progress regrow if this fires
-  mid-regrow after an Ouroboros collapse - Jörmungandr doesn't touch
-  the snake's length or position at all). Pause/rays/color otherwise
-  the same treatment as Ouroboros, just teal instead of gold and +1000
-  instead of +500. Leaderboard entries get a 🐉 badge.
 - **Basilisk**: appears the instant you swipe to resume after
   Ouroboros's own pause, gazing a wall out to the board edge in exactly
   the direction of that swipe - never some unrelated random direction,
@@ -97,15 +92,24 @@ a single run can earn all three.
   Surviving to see it clear is the achievement: same pause/rays
   treatment, +750, 🗿 badge - deliberately doesn't change the snake's
   color (see below). Only ever spawns once per run.
+- **Jörmungandr**: growing the snake to 80 segments (`JORMUNGANDR_LENGTH`
+  in `index.html`) triggers it - but only once the Basilisk has been
+  outgazed this run, and even then only re-checked on your next actual
+  food-eat, not just your next move (so an unlucky earlier moment - e.g.
+  crossing the length threshold, via food or an Ouroboros regrow, while
+  the Basilisk's wall is still up - can't chain the two pauses back to
+  back with no real play in between). Ouroboros's free life, if still
+  banked, carries through unaffected, and so does an in-progress regrow
+  if this fires mid-regrow after an Ouroboros collapse - Jörmungandr
+  doesn't touch the snake's length or position at all. Pause/rays/color
+  otherwise the same treatment as Ouroboros, just teal instead of gold
+  and +1000 instead of +500. Leaderboard entries get a 🐉 badge.
 
-Ouroboros and Jörmungandr each set the snake's color (gold, teal -
-whichever fired most recently) for the rest of the run; outgazing the
-Basilisk never does, so an unlucky interleaving (e.g. reaching
-Jörmungandr's length while the Basilisk's wall is still up, then
-outgazing it afterward) can't overwrite a color you already earned -
-gray only ever shows up on the Basilisk's own death screen, never on
-the living snake. A run that earns more than one shows all of their
-badges together next to the score regardless.
+Ouroboros and Jörmungandr each set the snake's color (gold, then teal
+once both have fired); outgazing the Basilisk never does, so it can't
+overwrite the gold you earn just before it - gray only ever shows up on
+the Basilisk's own death screen, never on the living snake. A run that
+earns all three shows all of their badges together next to the score.
 
 ## Running locally
 
