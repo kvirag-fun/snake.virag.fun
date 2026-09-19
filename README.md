@@ -132,6 +132,40 @@ overwrite the gold you earn just before it - gray only ever shows up on
 the Basilisk's own death screen, never on the living snake. A run that
 earns all three shows all of their badges together next to the score.
 
+### State reference
+
+The chain is strictly ordered, so a run is only ever in one of five
+states. Everything else follows from which one it's in:
+
+| State | How you got here | What's reachable | Hearts |
+| --- | --- | --- | --- |
+| Plain | run start | nothing - length does nothing, no wall | ` ♡ ♡ ` |
+| Ouroboros fired | bit your own tail tip | Basilisk spawns on your next swipe | ` ♥ ♡ ` |
+| Basilisk active | swiped to resume | outgaze it (15 apples) or die to it | ` ♥ ♡ ` |
+| Basilisk outgazed | ate 15 apples with the wall up | Jörmungandr, on a later food-eat | ` ♥ ♥ ` |
+| Jörmungandr found | grew back past the length threshold | nothing left - run it out | ` ♥ ♥ ` |
+
+Rules that hold across every state:
+
+- **Two lives, spent oldest first.** `handleDeath()` spends Ouroboros's
+  life before the Basilisk's, so a run forgives at most two deaths, in
+  that order, whatever killed you (wall, self, rotten, gaze).
+- **A forgiven death never resets progress.** It respawns you at the
+  board's center at length 1 and regrows you to your pre-death length;
+  the Basilisk's wall and its apple counter both survive it.
+- **Bonuses never affect difficulty.** Speed is driven by `pacingScore`,
+  which counts only real apples - the three bonuses are added to `score`
+  alone, so chasing them costs nothing in pace.
+- **Each egg fires exactly once**, and each later one needs the previous:
+  no Basilisk without Ouroboros, no Jörmungandr without the Basilisk.
+
+Known behavior worth expecting: the gaze wall can spawn on a tile
+orthogonally adjacent to the board's center (~1 in 3 runs). If you then
+spend a life while it's still up, you respawn at center with the wall
+immediately beside you - three of your four directions are still safe,
+and the run pauses for you to pick one, but swiping into the wall from
+the respawn is an instant second death.
+
 ## Running locally
 
 ```
