@@ -854,6 +854,11 @@
         let dx = 0;
         let dy = 0;
         let score = 0;
+        // Drives level/speed only - excludes the Ouroboros +500 bonus, so
+        // that bonus is a pure reward with no side effect on difficulty
+        // (score itself, shown and submitted to the leaderboard, does
+        // include it).
+        let pacingScore = 0;
         let gameRunning = false;
         let gameSpeed = 150;
         let gameInterval;
@@ -1339,10 +1344,11 @@
                 playSoundEffect('foodEatingSound');
                 
                 score += 10;
+                pacingScore += 10;
                 scoreElement.textContent = score;
-                updateLevelDisplay(score);
-                
-                gameSpeed = getGameSpeed(score);
+                updateLevelDisplay(pacingScore);
+
+                gameSpeed = getGameSpeed(pacingScore);
                 
                 randomFood();
                 randomBadFood();
@@ -1370,9 +1376,10 @@
             ouroborosTriggered = true;
             snakeGolden = true;
 
+            // Only score (shown/submitted) gets the bonus - pacingScore
+            // is untouched, so level and game speed don't jump too.
             score += 500;
             scoreElement.textContent = score;
-            updateLevelDisplay(score);
 
             dx = 0;
             dy = 0;
@@ -1449,8 +1456,9 @@
             dx = 0;
             dy = 0;
             score = 0;
+            pacingScore = 0;
             scoreElement.textContent = score;
-            updateLevelDisplay(score);
+            updateLevelDisplay(pacingScore);
             gameOverTopElement.hidden = true;
             gameOverBottomElement.hidden = true;
             gameRunning = true;
