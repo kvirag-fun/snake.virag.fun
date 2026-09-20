@@ -131,3 +131,31 @@ test('a diagonal drag - never perfectly axis-aligned, the normal case for a real
     const queued = await game.evaluate(() => window.__queued);
     expect(queued).toEqual([{ dx: 1, dy: 0 }]);
 });
+
+test('a near-diagonal drag resolves to one direction, not a right/down staircase', async ({ game }) => {
+    // A bare |deltaX| > |deltaY| is a knife-edge at exactly 45 degrees.
+    // Held close to that angle, the reference point resets every ~20px
+    // leg, and ordinary jitter is free to land each leg on either side of
+    // the edge - right, down, right, down - each one a genuinely
+    // different direction from the last, so each one queues. One
+    // continuous near-diagonal swipe turned into a staircase instead of
+    // the single turn the player made. AXIS_DOMINANCE requires one axis
+    // to clearly lead (1.5x) before anything resolves, so a drag this
+    // close to the diagonal shouldn't fire more than once.
+    await setUpSnake(game);
+    await game.evaluate(() => { dx = 0; dy = 1; });  // heading down, so rightward is a genuine turn
+    const touch = await cdpTouch(game);
+    const { x, y } = await boardOrigin(game);
+
+    await touch.down(x, y);
+    // A steady drag at exactly 45 degrees - the worst case for a bare
+    // dominance-free comparison.
+    for (let d = 10; d <= 160; d += 10) {
+        await touch.move(x + d, y + d);
+    }
+    await touch.up();
+
+    const queued = await game.evaluate(() => window.__queued);
+    const distinctDirs = new Set(queued.map(q => `${q.dx},${q.dy}`));
+    expect(distinctDirs.size).toBeLessThanOrEqual(1);
+});

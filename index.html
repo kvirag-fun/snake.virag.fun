@@ -2316,15 +2316,31 @@
         // component from how a thumb actually moves. With only one axis
         // resetting, the other axis's delta had nothing bounding it and
         // would eventually cross its own threshold on an ordinary swipe,
-        // firing a direction the player never intended (confirmed: even a
-        // ~10 degree deviation from straight reliably triggered it within
-        // one normal-length swipe). That's a far more common and more
-        // disruptive failure than the U-turn case it was meant to fix, so
-        // both axes resetting together - bounding both deltas to one
-        // threshold's worth of unaccounted movement at all times - is the
-        // right tradeoff, even though it means a genuine second turn
-        // packed very tightly behind the first inside one continuous drag
-        // can occasionally get missed.
+        // firing a direction the player never intended. That's a far more
+        // common and more disruptive failure than the U-turn case it was
+        // meant to fix, so both axes resetting together - bounding both
+        // deltas to one threshold's worth of unaccounted movement at all
+        // times - is the right tradeoff, even though it means a genuine
+        // second turn packed very tightly behind the first inside one
+        // continuous drag can occasionally get missed.
+        //
+        // A swipe close to the diagonal needs a dominance margin, not just
+        // "whichever axis is (even infinitesimally) ahead" - a bare
+        // |deltaX| > |deltaY| is a knife-edge at exactly 45 degrees, and a
+        // drag held near that angle re-resolves a fresh ~20px leg every
+        // time the reference point resets, with ordinary hand jitter free
+        // to land it on either side of that edge leg to leg. Each flip is
+        // a genuinely different direction from the one before, so each
+        // one queues - one continuous near-diagonal swipe turns into a
+        // right/down/right/down staircase instead of the single turn the
+        // player made. AXIS_DOMINANCE requires one axis to be clearly
+        // ahead (1.5x the other) before anything resolves at all, so nothing
+        // fires while a drag is genuinely ambiguous - it simply keeps
+        // accumulating against the same still-unreset reference point
+        // until the player's actual motion tips it decisively one way (or
+        // they lift without ever committing, which is the correct
+        // response to a swipe that truly never picked a direction).
+        const AXIS_DOMINANCE = 1.5;
         document.addEventListener('touchmove', (e) => {
             if (touchIsOnControl || !gameRunning) return;
             e.preventDefault();
@@ -2333,13 +2349,15 @@
             const touchY = e.touches[0].clientY;
             const deltaX = touchX - touchStartX;
             const deltaY = touchY - touchStartY;
+            const absX = Math.abs(deltaX);
+            const absY = Math.abs(deltaY);
             const lastDir = inputQueue.length > 0 ? inputQueue.at(-1) : { dx, dy };
             let newDir = null;
 
-            if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > minSwipeDistance) {
+            if (absX > absY * AXIS_DOMINANCE && absX > minSwipeDistance) {
                 if (deltaX > 0 && lastDir.dx !== -1) newDir = { dx: 1, dy: 0 };  // Right
                 else if (deltaX < 0 && lastDir.dx !== 1) newDir = { dx: -1, dy: 0 };  // Left
-            } else if (Math.abs(deltaY) > minSwipeDistance) {
+            } else if (absY > absX * AXIS_DOMINANCE && absY > minSwipeDistance) {
                 if (deltaY > 0 && lastDir.dy !== -1) newDir = { dx: 0, dy: 1 };  // Down
                 else if (deltaY < 0 && lastDir.dy !== 1) newDir = { dx: 0, dy: -1 };  // Up
             }
