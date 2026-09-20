@@ -80,24 +80,27 @@ can earn all three.
   after both lives are spent, is a normal death. Leaderboard entries
   that triggered it get a ♾️ badge next to the score.
 - **Basilisk**: appears the instant you swipe to resume after
-  Ouroboros's own pause, gazing a wall out to the board edge in exactly
-  the direction of that swipe - never some unrelated random direction,
-  so it's never a surprise: it only ever extends further along the
-  path you were already about to take. The origin (its head) is picked
-  at random from the 3 of the 8 tiles surrounding the board's center (a
-  3x3 area minus the middle - see `BASILISK_SPAWN_OFFSETS`/
-  `spawnBasilisk()`) that sit on that same side of center - e.g.
-  swiping right picks randomly among the right column's 3 tiles (the
-  side tile and both corners) and gazes right from whichever one it
-  lands on - excluding whichever of those 3 shares the snake's current
-  row (or column, for an up/down swipe), so an Ouroboros bite that
-  happened to land within the middle 3 rows/columns can't put the wall
-  right on the snake's own row/column the instant it appears. This
-  also guarantees the wall never originates at the center itself,
-  which is where a forgiven death always respawns. The
-  origin tile is stone gray with two purple eyes; the rest of the line
-  is the gaze itself, drawn in purple, since that's the part you
-  actually can't enter. Touching any tile of the wall, including its head, is its own death
+  Ouroboros's own pause, gazing a wall out to the board edge. The origin
+  (its head) is whichever of the 8 tiles surrounding the board's center
+  (a 3x3 area minus the middle - see `BASILISK_SPAWN_OFFSETS`/
+  `spawnBasilisk()`) sits farthest, by Manhattan distance, from the
+  snake's head at that moment - not tied to which way you swiped at all,
+  so a later respawn genuinely reconsiders from scratch based on where
+  the snake actually is by then. A side tile (directly above/below/left/
+  right of center) has only one sensible direction to gaze in - straight
+  out along its own axis, away from center; a corner tile has two
+  equally valid choices (its row's direction or its column's), so which
+  one it takes is a coin flip. Either way the wall only ever grows away
+  from center, one step at a time, so it can never fold back through the
+  center tile itself - which is where a forgiven death always respawns -
+  and (since a corner is always at least as far from any head position
+  as its two neighboring side tiles, by exactly one tile - the geometry
+  behind that is in the comment on `spawnBasilisk()`) the origin is in
+  practice always one of the 4 corners, never a side tile, except when
+  the snake's own body has forced a fallback (see below). The origin
+  tile is stone gray with two purple eyes; the rest of the line is the
+  gaze itself, drawn in purple, since that's the part you actually can't
+  enter. Touching any tile of the wall, including its head, is its own death
   cause - "You gazed into the Basilisk's eyes," with a game-over screen
   showing the snake turned to stone (same art as the other game-over
   screens, just recolored gray) - still forgiven by a banked free life
@@ -111,19 +114,21 @@ can earn all three.
   isn't. Not raw moves - circling in place can't clear a stage for
   free, you have to actually keep eating. Clearing stage 1 or 2 doesn't
   pause anything; the wall just respawns and the apple count for that
-  stage starts over at 0. A respawn's origin can be **any of the 8**
-  tiles surrounding center - not just the 3 on the current heading's
-  side the first spawn is limited to, since that first-look "never a
-  surprise, it only extends the path you're already on" reasoning
-  (see below) has already done its job by then - but is guaranteed
-  never to reappear at the tile it just vacated, so "respawns" always
-  means somewhere new. Whichever tile it picks, the wall still extends
-  along the snake's current heading from there, and it's checked
-  against the whole current body, not just its row/column, since by a
-  later stage the snake is no longer freshly collapsed and short the
-  way it is on the very first spawn - it may have grown enough to
-  genuinely pass near center, where every candidate originates. Only
-  clearing the third stage is the
+  stage starts over at 0. Every spawn, first or respawn alike, first
+  filters out any candidate whose wall would land directly on the
+  current snake body - checked against the whole body, not just its
+  head, since by a later stage the snake is no longer freshly collapsed
+  and short the way it is on the very first spawn, and may have grown
+  enough to genuinely pass near center, where every candidate
+  originates. A respawn additionally excludes the tile it just vacated,
+  so "respawns" always mean somewhere new, not a legitimate recomputation
+  back onto the same farthest tile as before. Both filters fall back a
+  step at a time - first allowing a repeat, then dropping body-safety
+  too - since a wall has to go somewhere even if every candidate
+  currently collides; avoiding the snake takes priority over the
+  no-repeat guarantee, and this is also the one way a side tile can end
+  up as the origin despite corners always outranking them on raw
+  distance. Only clearing the third stage is the
   achievement: same pause/rays treatment as Ouroboros, right down to
   collapsing to a single tile and regrowing back out one tile per move
   once play resumes (`regrowPending`), and banking its own **free
@@ -204,12 +209,16 @@ Rules that hold across every state:
 - **Each egg fires exactly once**, and each later one needs the previous:
   no Basilisk without Ouroboros, no Jörmungandr without the Basilisk.
 
-Known behavior worth expecting: the gaze wall can spawn on a tile
-orthogonally adjacent to the board's center (~1 in 3 runs). If you then
-spend a life while it's still up, you respawn at center with the wall
-immediately beside you - three of your four directions are still safe,
-and the run pauses for you to pick one, but swiping into the wall from
-the respawn is an instant second death.
+Known behavior worth expecting: since the origin is in practice always
+one of the 4 corner tiles (see above), and a corner's wall - whichever
+axis it grows along - never touches a tile orthogonally adjacent to
+center, spending a life while the Basilisk is up and respawning at
+center leaves all four directions safe in ordinary play. The one
+exception is the fallback path: if the snake's own body has forced the
+origin onto a side tile instead, that tile *is* orthogonally adjacent to
+center, so three of your four directions are still safe and the run
+pauses for you to pick one, but swiping into the wall from the respawn
+is an instant second death.
 
 ## Running locally
 

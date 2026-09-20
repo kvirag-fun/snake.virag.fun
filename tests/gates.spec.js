@@ -26,6 +26,16 @@ async function spendALife(game) {
         const h = window.__game;
         h.fireOuroboros();
         h.dismissAndResume(1, 0);
+        // dismissAndResume() also spawns the Basilisk as a side effect of
+        // getting past Ouroboros's own gate - not what this file tests,
+        // and its wall can (in the fallback case the snake's own body
+        // forces) legitimately end up adjacent to the center tile a
+        // respawn below lands on, leaving as few as 3 of 4 directions
+        // safe there instead of the usual 4 - see basilisk.spec.js.
+        // Clearing it removes that unrelated interaction rather than
+        // picking a move direction that happens to dodge it.
+        basiliskActive = false;
+        basiliskWall = [];
         h.finishRegrow();
         // Straight into the right wall - forgiven, since the life is banked.
         snake[0] = { x: tileCount - 1, y: snake[0].y };

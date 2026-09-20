@@ -3,6 +3,17 @@
 // sequential stages (a new wall each time one clears - see
 // spawnBasilisk()/randomBasiliskStageQuotas() in index.html) totalling
 // 20 apples, however randomly they end up split across the stages.
+//
+// The origin is whichever of the 8 tiles surrounding board center sits
+// farthest (Manhattan distance) from the snake's head at spawn time - not
+// tied to the player's heading at all. A side tile (N/S/E/W) has only one
+// sensible growth direction, straight out along its own axis; a corner
+// tile has two, so which one it takes is a coin flip. Either way the wall
+// only ever grows away from center, so it can never fold back through the
+// exact center tile, where a forgiven death always respawns. A respawn
+// additionally never reappears at the tile it just vacated, and the whole
+// selection defers to snake-body safety first, falling back only when
+// nothing collision-free is left to offer.
 import { test, expect } from './helpers.js';
 
 const TRIALS = 120;
@@ -22,40 +33,80 @@ test('it spawns on the swipe that resumes play after Ouroboros', async ({ game }
     expect(state.basiliskFoodCounter).toBe(0);
 });
 
-test('the gaze is a straight line from its origin to the board edge', async ({ game }) => {
-    const wall = await game.evaluate(() => {
-        const h = window.__game;
-        h.fireOuroboros();
-        h.dismissAndResume(1, 0);          // resume heading right
-        return h.state().basiliskWall;
-    });
-    const [origin] = wall;
-    // Heading right: same row, consecutive columns, ending at the wall.
-    expect(wall.every((tile) => tile.y === origin.y)).toBe(true);
-    wall.forEach((tile, i) => expect(tile.x).toBe(origin.x + i));
-    expect(wall[wall.length - 1].x).toBe(19);
+test('each candidate wall is a straight line from its origin, growing away from center, to the board edge', async ({ game }) => {
+    const result = await game.evaluate((trials) => {
+        const centerX = Math.floor(tileCount / 2);
+        const centerY = Math.floor(tileCount / 2);
+        const walls = [];
+        for (let i = 0; i < trials; i++) {
+            snake = [{
+                x: Math.floor(Math.random() * tileCount),
+                y: Math.floor(Math.random() * tileCount),
+            }];
+            spawnBasilisk();
+            walls.push(basiliskWall.map((s) => ({ x: s.x, y: s.y })));
+        }
+        return { walls, centerX, centerY };
+    }, TRIALS);
+
+    for (const wall of result.walls) {
+        const [origin, second] = wall;
+        const dir = { x: second.x - origin.x, y: second.y - origin.y };
+        // Axis-aligned, single-step, and constant for the whole line.
+        expect(Math.abs(dir.x) + Math.abs(dir.y)).toBe(1);
+        wall.forEach((tile, i) => {
+            expect(tile.x).toBe(origin.x + dir.x * i);
+            expect(tile.y).toBe(origin.y + dir.y * i);
+        });
+        // Reaches an edge - one more step in `dir` would run off the board.
+        const last = wall[wall.length - 1];
+        const nextX = last.x + dir.x;
+        const nextY = last.y + dir.y;
+        expect(nextX < 0 || nextX >= 20 || nextY < 0 || nextY >= 20).toBe(true);
+        // Grows away from center: the wall's one nonzero axis points the
+        // same way the origin is already offset from center on that axis.
+        if (dir.x !== 0) expect(Math.sign(dir.x)).toBe(Math.sign(origin.x - result.centerX));
+        if (dir.y !== 0) expect(Math.sign(dir.y)).toBe(Math.sign(origin.y - result.centerY));
+    }
 });
 
-test('the gaze points wherever the player swiped, never elsewhere', async ({ game }) => {
-    const headings = await game.evaluate(() => {
-        const h = window.__game;
-        const seen = [];
-        for (const [hdx, hdy] of [[1, 0], [0, 1], [0, -1]]) {
-            h.fireOuroboros();
-            h.dismissAndResume(hdx, hdy);
-            const wall = basiliskWall;
-            seen.push({
-                hdx,
-                hdy,
-                stepX: wall[1].x - wall[0].x,
-                stepY: wall[1].y - wall[0].y,
-            });
+test('the origin is whichever of the 8 candidate tiles sits farthest from the head', async ({ game }) => {
+    // Heads are kept clear of rows/columns 9-11, the only rows/columns any
+    // candidate's wall can ever occupy - otherwise the head itself could
+    // occasionally sit on the "farthest" candidate's own line, correctly
+    // triggering the body-safety filter (tested separately below) and
+    // producing a false mismatch here, which only tests pure distance.
+    const result = await game.evaluate((trials) => {
+        const centerX = Math.floor(tileCount / 2);
+        const centerY = Math.floor(tileCount / 2);
+        const randCoord = () => {
+            let v;
+            do { v = Math.floor(Math.random() * tileCount); } while (v >= 8 && v <= 11);
+            return v;
+        };
+        let mismatches = 0;
+        const originsSeen = new Set();
+        for (let i = 0; i < trials; i++) {
+            const head = { x: randCoord(), y: randCoord() };
+            snake = [head];
+            spawnBasilisk();
+            const candidates = BASILISK_SPAWN_OFFSETS.map((o) => ({
+                x: centerX + o.x,
+                y: centerY + o.y,
+                d: Math.abs(centerX + o.x - head.x) + Math.abs(centerY + o.y - head.y),
+            }));
+            const maxDist = Math.max(...candidates.map((c) => c.d));
+            const best = candidates.filter((c) => c.d === maxDist);
+            const origin = basiliskWall[0];
+            if (!best.some((c) => c.x === origin.x && c.y === origin.y)) mismatches++;
+            originsSeen.add(`${origin.x - centerX},${origin.y - centerY}`);
         }
-        return seen;
-    });
-    for (const { hdx, hdy, stepX, stepY } of headings) {
-        expect({ stepX, stepY }).toEqual({ stepX: hdx, stepY: hdy });
-    }
+        return { mismatches, originsSeen: [...originsSeen] };
+    }, TRIALS);
+
+    expect(result.mismatches).toBe(0);
+    // Genuinely tracks the head around the board, not stuck on one tile.
+    expect(result.originsSeen.length).toBeGreaterThan(1);
 });
 
 test('it never originates on the tile a forgiven death respawns you on', async ({ game }) => {
@@ -80,24 +131,29 @@ test('it never originates on the tile a forgiven death respawns you on', async (
     expect(result.offBy).toBe(0);
 });
 
-test('it never spawns onto the row the snake is already travelling along', async ({ game }) => {
-    const ambushes = await game.evaluate((trials) => {
-        const h = window.__game;
-        let count = 0;
+test("a corner origin's growth axis is a coin flip", async ({ game }) => {
+    // Head far in the top-left corner of the board: the bottom-right
+    // spawn candidate (a corner tile) is then the unique farthest one on
+    // every call, isolating the coin flip between its two axes from any
+    // variation in which candidate gets chosen.
+    const dirs = await game.evaluate((trials) => {
+        const seen = new Set();
         for (let i = 0; i < trials; i++) {
-            h.fireOuroboros();
-            const headY = snake[0].y;
-            h.dismissAndResume(1, 0);
-            if (basiliskWall.some((tile) => tile.y === headY)) count++;
+            snake = [{ x: 0, y: 0 }];
+            spawnBasilisk();
+            const [a, b] = basiliskWall;
+            seen.add(`${b.x - a.x},${b.y - a.y}`);
         }
-        return count;
+        return [...seen].sort();
     }, TRIALS);
-    expect(ambushes).toBe(0);
+    expect(dirs).toEqual(['0,1', '1,0']);
 });
 
 test('a forgiven death always leaves at least three safe directions', async ({ game }) => {
-    // The wall can legitimately spawn orthogonally adjacent to centre, so
-    // respawning while it's up can cost one direction - but never two.
+    // A corner-tile origin (see the coin-flip test above; the default
+    // Ouroboros setup always produces one) never touches an orthogonal
+    // neighbour of centre on either of its two possible axes, so this
+    // should hold regardless of which way the coin lands.
     const worst = await game.evaluate((trials) => {
         const h = window.__game;
         let fewest = 4;
@@ -251,118 +307,130 @@ test('outgazing always takes exactly 20 apples, regardless of how the stages spl
     }
 });
 
+// ---- direct spawnBasilisk() calls: body safety, fallbacks, no-repeat --
+
 test('the first spawn avoids spawning its wall through the current snake body', async ({ game }) => {
-    // Isolate the body check from the pre-existing row/column check: the
-    // head sits on a row none of the 3 heading-right candidates use, but
-    // a lone body segment sits directly on one candidate's line - only a
-    // check against the whole body, not just the head's row, would catch
-    // that one. Calls spawnBasilisk() with no previousOrigin, i.e. the
-    // first-spawn path (3 heading-side candidates) - see the respawn
-    // versions of this below, which exercise the other path.
+    // Head far in the top-left, so the bottom-right corner tile is the
+    // unique farthest candidate (see the "farthest tile" test above).
+    // Blocking that exact tile forces every direction choice for it to
+    // collide - the origin is always a wall's first tile, whichever axis
+    // it then grows along (see wallFor() in index.html) - so this
+    // isolates the body-safety filter from the farthest-tile selection:
+    // without it, the Basilisk would spawn straight onto the snake.
     const result = await game.evaluate((trials) => {
         const centerX = Math.floor(tileCount / 2);
         const centerY = Math.floor(tileCount / 2);
-        const blockedY = centerY - 1;      // the {x:1,y:-1} candidate's row
         let collisions = 0;
-        let blockedRowChosen = 0;
-        const rowsSeen = new Set();
+        let stillPickedBlocked = 0;
+        const originsSeen = new Set();
         for (let i = 0; i < trials; i++) {
-            snake = [
-                { x: 5, y: 5 },                                    // off every candidate's row
-                { x: centerX + 3, y: blockedY },                   // blocks the {1,-1} candidate's line
-            ];
-            dx = 1;
-            dy = 0;
-            spawnBasilisk(1, 0);
-            rowsSeen.add(basiliskWall[0].y);
-            if (basiliskWall[0].y === blockedY) blockedRowChosen++;
+            snake = [{ x: 0, y: 0 }, { x: centerX + 1, y: centerY + 1 }];
+            spawnBasilisk();
+            const origin = basiliskWall[0];
+            originsSeen.add(`${origin.x},${origin.y}`);
+            if (origin.x === centerX + 1 && origin.y === centerY + 1) stillPickedBlocked++;
             if (basiliskWall.some((seg) => snake.some((s) => s.x === seg.x && s.y === seg.y))) {
                 collisions++;
             }
         }
-        return { collisions, blockedRowChosen, rowsSeen: [...rowsSeen] };
+        return { collisions, stillPickedBlocked, originsSeen: [...originsSeen] };
     }, TRIALS);
 
     expect(result.collisions).toBe(0);
-    expect(result.blockedRowChosen).toBe(0);
-    // The other two candidates are still both in play - this isn't
-    // "always pick the same safe one".
-    expect(result.rowsSeen.length).toBeGreaterThan(1);
+    expect(result.stillPickedBlocked).toBe(0);
+    // Falls to a single deterministic next-best tile here - see the
+    // fallback-direction test below, not "any of several".
+    expect(result.originsSeen).toEqual(['10,11']);
 });
 
-test('falls back to a row/column-safe candidate if every one collides with the body', async ({ game }) => {
-    // Deliberately adversarial: block all 3 heading-right candidates'
-    // rows with body segments, none on the head's own row either. There
-    // is no collision-free tile left to offer, so this only checks the
-    // function still produces a wall rather than leaving the Basilisk
-    // silently un-spawned.
-    const result = await game.evaluate(() => {
-        const centerX = Math.floor(tileCount / 2);
-        const centerY = Math.floor(tileCount / 2);
-        snake = [
-            { x: 5, y: 5 },
-            { x: centerX + 2, y: centerY - 1 },
-            { x: centerX + 2, y: centerY },
-            { x: centerX + 2, y: centerY + 1 },
-        ];
-        dx = 1;
-        dy = 0;
-        spawnBasilisk(1, 0);
-        return { active: basiliskActive, wallLength: basiliskWall.length };
-    });
-    expect(result.active).toBe(true);
-    expect(result.wallLength).toBeGreaterThan(0);
-});
-
-// ---- a respawn (stage 2 or 3) picks from all 8, never repeats --------
-
-test('a respawn can originate from any of the 8 tiles, not just the 3 on the heading side', async ({ game }) => {
-    // A previousOrigin far outside the 8 real candidates excludes
-    // nothing on its own, isolating just the pool-widening part of a
-    // respawn from the no-repeat guarantee.
-    const sides = await game.evaluate((trials) => {
+test("a fallback side-tile origin's growth axis is fixed, not a coin flip", async ({ game }) => {
+    // Same forced-fallback setup as the body-safety test above: with the
+    // bottom-right corner blocked, the tie-break among the remaining
+    // candidates always lands on the same side tile - which, unlike a
+    // corner, has only one valid growth axis (see directionFor() in
+    // index.html), so unlike the corner coin flip this should never vary.
+    const dirs = await game.evaluate((trials) => {
         const centerX = Math.floor(tileCount / 2);
         const centerY = Math.floor(tileCount / 2);
         const seen = new Set();
         for (let i = 0; i < trials; i++) {
-            snake = [{ x: 5, y: 5 }];
-            dx = 1;
-            dy = 0;
-            spawnBasilisk(1, 0, { x: -99, y: -99 });
-            const origin = basiliskWall[0];
-            seen.add(`${origin.x - centerX},${origin.y - centerY}`);
+            snake = [{ x: 0, y: 0 }, { x: centerX + 1, y: centerY + 1 }];
+            spawnBasilisk();
+            const [a, b] = basiliskWall;
+            seen.add(`${b.x - a.x},${b.y - a.y}`);
         }
         return [...seen];
     }, TRIALS);
-
-    // The first spawn's pool is only the 3 offsets with x === 1 (heading
-    // right): 1,-1 / 1,0 / 1,1. Seeing anything outside that set proves
-    // a respawn really does draw from all 8, not just those 3.
-    const headingSideOnly = new Set(['1,-1', '1,0', '1,1']);
-    expect(sides.some((s) => !headingSideOnly.has(s))).toBe(true);
+    expect(dirs).toEqual(['0,1']);
 });
 
-test('a respawn never reappears at the tile it just vacated', async ({ game }) => {
-    // Direct, repeated calls rather than real play: each iteration
-    // respawns off of the previous call's own origin, so this checks the
-    // no-repeat guarantee in isolation, independent of how update()
-    // wires it up (that's covered by the in-play test below).
-    const repeats = await game.evaluate((trials) => {
+test('falls back to an unsafe candidate only when every one collides with the body', async ({ game }) => {
+    // Deliberately adversarial: a segment sitting on every one of the 8
+    // origin tiles blocks every candidate's wall (the origin tile is
+    // always a wall's first tile, whichever direction it grows in - see
+    // wallFor()), so there's no collision-free tile left to offer. This
+    // only checks the function still produces a wall rather than leaving
+    // the Basilisk silently un-spawned - avoiding the snake takes
+    // priority right up until it's genuinely impossible.
+    const result = await game.evaluate(() => {
+        const centerX = Math.floor(tileCount / 2);
+        const centerY = Math.floor(tileCount / 2);
+        snake = [
+            { x: 0, y: 0 },
+            ...BASILISK_SPAWN_OFFSETS.map((o) => ({ x: centerX + o.x, y: centerY + o.y })),
+        ];
+        spawnBasilisk();
+        const origin = basiliskWall[0];
+        const originIsBlocked = BASILISK_SPAWN_OFFSETS.some(
+            (o) => centerX + o.x === origin.x && centerY + o.y === origin.y
+        );
+        return { active: basiliskActive, wallLength: basiliskWall.length, originIsBlocked };
+    });
+    expect(result.active).toBe(true);
+    expect(result.wallLength).toBeGreaterThan(0);
+    expect(result.originIsBlocked).toBe(true);
+});
+
+test('the wall never crosses the exact center tile', async ({ game }) => {
+    // Structural under this design - every wall grows away from centre,
+    // one step at a time, so it can never fold back through it (see the
+    // big comment on spawnBasilisk() in index.html) - but a random-head
+    // sample across many spawns, including forced respawns, is cheap
+    // insurance against a regression in that logic.
+    const sawCenter = await game.evaluate((trials) => {
         const centerX = Math.floor(tileCount / 2);
         const centerY = Math.floor(tileCount / 2);
         let count = 0;
+        let previous = null;
         for (let i = 0; i < trials; i++) {
-            snake = [{ x: 5, y: 5 }];
-            dx = 1;
-            dy = 0;
-            spawnBasilisk(1, 0);                       // first spawn, establishes an origin
-            const previous = { ...basiliskWall[0] };
-            spawnBasilisk(1, 0, previous);              // respawn off of it
-            if (basiliskWall[0].x === previous.x && basiliskWall[0].y === previous.y) count++;
+            snake = [{
+                x: Math.floor(Math.random() * tileCount),
+                y: Math.floor(Math.random() * tileCount),
+            }];
+            spawnBasilisk(previous);
+            if (basiliskWall.some((s) => s.x === centerX && s.y === centerY)) count++;
+            previous = { ...basiliskWall[0] };
         }
         return count;
     }, TRIALS);
-    expect(repeats).toBe(0);
+    expect(sawCenter).toBe(0);
+});
+
+test('a respawn never reappears at the tile it just vacated', async ({ game }) => {
+    // A fixed head keeps the "farthest" candidate exactly the same
+    // between calls, so without the no-repeat guarantee a respawn would
+    // legitimately recompute right back onto it - the scenario this
+    // guarantee exists for (see the big comment on spawnBasilisk() in
+    // index.html).
+    const result = await game.evaluate(() => {
+        snake = [{ x: 0, y: 0 }];
+        spawnBasilisk();                       // first spawn
+        const first = { ...basiliskWall[0] };
+        spawnBasilisk(first);                  // respawn off of it
+        const second = { ...basiliskWall[0] };
+        return { first, second };
+    });
+    expect(result.second).not.toEqual(result.first);
 });
 
 test('clearing a stage in real play never respawns the wall at the same tile', async ({ game }) => {
@@ -384,38 +452,27 @@ test('clearing a stage in real play never respawns the wall at the same tile', a
     expect(repeats).toBe(0);
 });
 
-test("a respawn's body-safety check also covers the wider 8-tile pool", async ({ game }) => {
-    // Heading right, so the first-spawn pool would only ever be the 3
-    // right-side candidates ({x:1,...}) - {x:0,y:-1} ("north side") isn't
-    // among them at all, so only a respawn (which can pick it) has any
-    // reason to avoid it, and only a check over the full pool would
-    // catch it. Its wall runs from (centerX, centerY-1) rightward, so a
-    // body segment anywhere on that row, right of center, blocks it -
-    // along with the two corner candidates that share the same row.
-    const result = await game.evaluate((trials) => {
+test("a respawn's body-safety check applies on top of the no-repeat guarantee", async ({ game }) => {
+    // The deterministic next-best tile after excluding the first origin
+    // via the no-repeat guarantee alone (see the test above) is blocked
+    // here with a body segment too, forcing the respawn to skip past it
+    // as well - proving the two filters combine rather than one
+    // overriding the other.
+    const result = await game.evaluate(() => {
         const centerX = Math.floor(tileCount / 2);
         const centerY = Math.floor(tileCount / 2);
-        let collisions = 0;
-        let sawNorthRow = false;
-        for (let i = 0; i < trials; i++) {
-            snake = [
-                { x: 5, y: 5 },
-                { x: centerX + 3, y: centerY - 1 },   // on the {0,-1} candidate's row
-            ];
-            dx = 1;
-            dy = 0;
-            spawnBasilisk(1, 0, { x: -99, y: -99 });   // respawn pool (far previousOrigin excludes nothing)
-            if (basiliskWall[0].y === centerY - 1) sawNorthRow = true;
-            if (basiliskWall.some((seg) => snake.some((s) => s.x === seg.x && s.y === seg.y))) {
-                collisions++;
-            }
-        }
-        return { collisions, sawNorthRow };
-    }, TRIALS);
-    expect(result.collisions).toBe(0);
-    // Confirms that row really was among the offered candidates (just
-    // never the one actually picked, thanks to the body block).
-    expect(result.sawNorthRow).toBe(false);
+        snake = [{ x: 0, y: 0 }];
+        spawnBasilisk();
+        const first = { ...basiliskWall[0] };
+        snake = [{ x: 0, y: 0 }, { x: centerX, y: centerY + 1 }]; // blocks the no-repeat fallback tile
+        spawnBasilisk(first);
+        return {
+            origin: { ...basiliskWall[0] },
+            collides: basiliskWall.some((seg) => snake.some((s) => s.x === seg.x && s.y === seg.y)),
+        };
+    });
+    expect(result.origin).not.toEqual({ x: 10, y: 11 });
+    expect(result.collides).toBe(false);
 });
 
 test('touching the gaze is its own death cause', async ({ game }) => {

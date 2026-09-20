@@ -1561,7 +1561,7 @@
                 if (resumedKind === 'ouroboros' && !basiliskTriggered && !basiliskActive) {
                     basiliskStage = 1;
                     basiliskStageQuotas = randomBasiliskStageQuotas();
-                    spawnBasilisk(nextDx, nextDy);
+                    spawnBasilisk();
                 }
             }
 
@@ -1666,15 +1666,15 @@
             // apples have been eaten since its wall last (re)spawned is
             // the achievement - the wall itself doesn't reward anything,
             // only outlasting it does. Before the last stage, "surviving"
-            // just moves the wall (any of the 8 candidates now, never the
-            // one it's replacing - see spawnBasilisk()) rather than
-            // ending the encounter. Checked before Jörmungandr below,
-            // since Jörmungandr now requires the whole encounter to have
-            // already finished.
+            // just moves the wall (recomputed from scratch against
+            // wherever the snake is now - see spawnBasilisk() - never the
+            // tile it's replacing) rather than ending the encounter.
+            // Checked before Jörmungandr below, since Jörmungandr now
+            // requires the whole encounter to have already finished.
             if (!specialEventWaiting && basiliskActive && basiliskFoodCounter >= basiliskStageQuotas[basiliskStage - 1]) {
                 if (basiliskStage < BASILISK_STAGE_COUNT) {
                     basiliskStage++;
-                    spawnBasilisk(dx, dy, basiliskWall[0]);
+                    spawnBasilisk(basiliskWall[0]);
                 } else {
                     triggerBasiliskSurvived();
                 }
@@ -1849,97 +1849,113 @@
 
         // Basilisk easter egg: can only appear after Ouroboros has already
         // fired (see the specialEventWaiting-resume branch in update(),
-        // which sets up the stage count/quotas and calls this for the
-        // first time) - spawns the moment play resumes after Ouroboros's
-        // own pause, gazing a wall of blocked tiles out to the board
-        // edge. Touching any tile of it, including the origin, is a death
-        // like any wall (see the basiliskActive check in update()). Also
-        // the function a cleared stage calls again for the next one (see
-        // the stage-advance check in update()), passing `previousOrigin`
-        // (the wall it's replacing) - that's what tells this call it's a
-        // respawn rather than the first spawn, and both what it can pick
-        // from and what it's guaranteed to avoid change accordingly (see
-        // below).
+        // which calls this the first time) - spawns the moment play
+        // resumes after Ouroboros's own pause, gazing a wall of blocked
+        // tiles out to the board edge. Touching any tile of it, including
+        // the origin, is a death like any wall (see the basiliskActive
+        // check in update()). Also the function a cleared stage calls
+        // again for the next one (see the stage-advance check in
+        // update()), passing `previousOrigin` (the wall it's replacing) -
+        // that's what tells this call it's a respawn rather than the
+        // first spawn.
         //
-        // The wall always extends along whichever direction the player is
-        // currently heading (headingX/headingY), regardless of which of
-        // the 8 candidates below the origin comes from - never some
-        // unrelated direction picked independently of where the snake is
-        // actually going.
+        // The origin is whichever of the 8 tiles surrounding board center
+        // is currently FARTHEST from the snake's head (Manhattan
+        // distance) - not tied to the player's heading at all, so a
+        // respawn genuinely reconsiders from scratch based on where the
+        // snake actually is by then, not just where it was heading a
+        // moment ago. A side tile (N/S/E/W) has one obvious direction to
+        // grow in - straight out along its own axis, away from center;
+        // a corner tile has two equally valid choices (its row's
+        // direction or its column's), so which one it takes is a coin
+        // flip. Either way the wall only ever grows AWAY from center, one
+        // step at a time - it structurally can never fold back through
+        // the center tile itself, which is where a forgiven death always
+        // respawns (see respawnWithSameLength()) - no separate check
+        // needed for that the way a heading-tied design would require.
         //
-        // The very first spawn only offers the 3 of the 8 tiles
-        // surrounding board center that sit on the same side as the swipe
-        // that triggered it (e.g. heading right picks randomly among the
-        // right column's 3 tiles - side, upper-corner, lower-corner), so
-        // it only ever extends further along the path already being
-        // taken - never a surprise, since that's the first look the
-        // player gets at the Basilisk at all. A respawn (previousOrigin
-        // given, i.e. clearing stage 1 or 2) has already established that
-        // shock, so it drops that restriction and can originate from any
-        // of the 8 - but is guaranteed not to reappear at the exact tile
-        // it just vacated, so "respawn" always means somewhere new. Either
-        // way, no candidate ever originates at the center itself, where a
-        // forgiven death always respawns (see respawnWithSameLength()).
-        function spawnBasilisk(headingX, headingY, previousOrigin) {
+        // Because "farthest from head" is deterministic (only a corner's
+        // direction is randomised), a respawn could otherwise legitimately
+        // recompute to the exact same tile as before if the snake hasn't
+        // moved much relative to center between stages - so a respawn is
+        // additionally guaranteed not to reappear at the tile it just
+        // vacated (see notRepeat below).
+        function spawnBasilisk(previousOrigin) {
             const centerX = Math.floor(tileCount / 2);
             const centerY = Math.floor(tileCount / 2);
             const headPos = snake[0];
 
-            const onHeadingSide = (o) => headingX !== 0 ? o.x === headingX : o.y === headingY;
-            const pool = previousOrigin ? BASILISK_SPAWN_OFFSETS : BASILISK_SPAWN_OFFSETS.filter(onHeadingSide);
-
-            // Avoid the candidate that shares the snake's current row
-            // (heading left/right) or column (heading up/down) - otherwise
-            // the wall (which always extends along that same row/column,
-            // whichever of the 8 tiles it starts from) could land right on
-            // the snake's own row/column the instant it appears, ambushing
-            // the player. Applies to any candidate alike, first spawn or
-            // respawn - always leaves at least half the pool, since at
-            // most 3 of the 8 offsets ever share one particular row or
-            // column value.
-            const rowColSafe = pool.filter((o) =>
-                headingX !== 0 ? centerY + o.y !== headPos.y : centerX + o.x !== headPos.x
-            );
-
-            // A respawn must not reappear at the tile it just vacated -
-            // "somewhere new" is the whole point, not just statistically
-            // likely. No-op on the first spawn, where there's no previous
-            // origin to avoid.
-            const notRepeat = previousOrigin
-                ? rowColSafe.filter((o) => centerX + o.x !== previousOrigin.x || centerY + o.y !== previousOrigin.y)
-                : rowColSafe;
-
-            // For a later stage, the snake is no longer necessarily short
-            // and freshly collapsed at center the way it is on the very
-            // first spawn - by now it may have grown enough to actually
-            // pass near center, where every candidate originates. Build
-            // each remaining candidate's full wall line and drop any that
-            // would land directly on the current body, so a stage never
-            // transitions into an instant, unavoidable death by spawning
-            // a wall through the snake itself. Falls back a step at a
-            // time - first to allowing a repeat (still snake-safe), then
-            // to rowColSafe outright - since a long enough body coiled
-            // through center could in principle rule out every other
-            // option; avoiding the snake takes priority over both the
-            // heading restriction and the no-repeat guarantee, but this
-            // spawn always has to place a wall somewhere.
-            const wallFor = (o) => {
+            // A side tile's offset already points straight out along its
+            // own axis - that's its only sensible growth direction. A
+            // corner tile (both x and y nonzero) has two valid axes to
+            // grow along; picked once per candidate here, not re-rolled
+            // every time it's checked below.
+            const directionFor = (o) => {
+                if (o.x === 0) return { x: 0, y: o.y };
+                if (o.y === 0) return { x: o.x, y: 0 };
+                return Math.random() < 0.5 ? { x: o.x, y: 0 } : { x: 0, y: o.y };
+            };
+            const wallFor = (o, dir) => {
                 const wall = [{x: centerX + o.x, y: centerY + o.y}];
                 let x = wall[0].x, y = wall[0].y;
-                while (x + headingX >= 0 && x + headingX < tileCount && y + headingY >= 0 && y + headingY < tileCount) {
-                    x += headingX;
-                    y += headingY;
+                while (x + dir.x >= 0 && x + dir.x < tileCount && y + dir.y >= 0 && y + dir.y < tileCount) {
+                    x += dir.x;
+                    y += dir.y;
                     wall.push({x, y});
                 }
                 return wall;
             };
-            const isBodySafe = (o) => !wallFor(o).some((seg) => snake.some((s) => s.x === seg.x && s.y === seg.y));
-            const candidates = notRepeat.some(isBodySafe) ? notRepeat.filter(isBodySafe)
-                : rowColSafe.some(isBodySafe) ? rowColSafe.filter(isBodySafe)
-                : rowColSafe;
 
-            const offset = candidates[Math.floor(Math.random() * candidates.length)];
-            basiliskWall = wallFor(offset);
+            // Every candidate, its (possibly random) direction, its full
+            // wall line, and its distance from the current head - built
+            // once so the direction stays fixed per candidate throughout
+            // the filtering below, and sorted farthest-first so "pick the
+            // one furthest from head" just means "take the first survivor".
+            const all = BASILISK_SPAWN_OFFSETS.map((o) => {
+                const dir = directionFor(o);
+                return {
+                    origin: { x: centerX + o.x, y: centerY + o.y },
+                    wall: wallFor(o, dir),
+                    dist: Math.abs(centerX + o.x - headPos.x) + Math.abs(centerY + o.y - headPos.y),
+                };
+            }).sort((a, b) => b.dist - a.dist);
+
+            // Never lands directly on the current snake - the wall's full
+            // line, not just its origin, checked against every segment,
+            // not just the head. Structurally replaces the narrower "same
+            // row/column as the head" check a heading-tied design needed:
+            // an exact-tile check is both simpler and strictly stronger.
+            const isBodySafe = (c) => !c.wall.some((seg) => snake.some((s) => s.x === seg.x && s.y === seg.y));
+            const bodySafe = all.filter(isBodySafe);
+
+            // A respawn must not reappear at the tile it just vacated -
+            // "somewhere new" is the whole point, not just statistically
+            // likely, and "farthest from head" alone wouldn't guarantee
+            // that on its own, being deterministic (only a corner's
+            // direction is randomised) - see the big comment above. No-op
+            // on the first spawn, where there's no previous origin to
+            // avoid.
+            const notRepeat = previousOrigin
+                ? bodySafe.filter((c) => c.origin.x !== previousOrigin.x || c.origin.y !== previousOrigin.y)
+                : bodySafe;
+
+            // For a later stage, the snake is no longer necessarily short
+            // and freshly collapsed at center the way it is on the very
+            // first spawn - by now it may have grown enough to actually
+            // pass near center, where every candidate originates. Falls
+            // back a step at a time - first to allowing a repeat (still
+            // snake-safe), then to every candidate regardless - since
+            // even this could in principle all collide; avoiding the
+            // snake takes priority over the no-repeat guarantee, but this
+            // spawn always has to place a wall somewhere right now.
+            const candidates = notRepeat.length > 0 ? notRepeat
+                : bodySafe.length > 0 ? bodySafe
+                : all;
+
+            // `all` (and so every filtered subset of it) is already
+            // sorted farthest-from-head first, so the surviving candidate
+            // at the front is exactly the one to use.
+            basiliskWall = candidates[0].wall;
             basiliskActive = true;
             basiliskFoodCounter = 0;
 
