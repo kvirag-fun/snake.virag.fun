@@ -160,7 +160,7 @@ can earn all three.
   same dark purple as the Basilisk's, for the rest of the run. Only
   ever spawns once per run (so there's only ever one of *this* free
   life to spend, same as Ouroboros's own).
-- **Jörmungandr**: growing the snake to 80 segments (`JORMUNGANDR_LENGTH`
+- **Jörmungandr**: growing the snake to 90 segments (`JORMUNGANDR_LENGTH`
   in `index.html`) triggers it - but only once the Basilisk has been
   outgazed this run, and even then only re-checked on your next actual
   food-eat, not just your next move (so an unlucky earlier moment - e.g.
