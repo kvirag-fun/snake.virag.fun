@@ -4,3 +4,6 @@ dist
 firestore-debug.log
 firebase-debug.log
 .DS_Store
+
+test-results
+playwright-report

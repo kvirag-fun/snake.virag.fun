@@ -186,6 +186,35 @@ Local dev always talks to the Firestore emulator, not the real project
 (see "Global leaderboard" below) — it works before any real Firebase
 config exists.
 
+## Tests
+
+```
+bun run test          # headless
+bun run test:ui       # Playwright's watch/inspector UI
+```
+
+End-to-end tests (`tests/`) driven by Playwright against a headless
+Chromium. There's no test build or harness in the game itself: because
+`index.html` is a single classic `<script>`, all of its state lives in
+the page's global scope, so a test can set up an exact board position,
+call `update()` once, and assert on what came out. `tests/helpers.js`
+holds the shared fixture and the in-page helpers, including the two
+traps that bite otherwise — the game's own `requestAnimationFrame` loop
+must be frozen (and re-frozen after any tick that ate food, which
+reassigns `gameSpeed`), and the special-event pause makes `update()` a
+silent no-op until it's dismissed.
+
+| Spec | Covers |
+| --- | --- |
+| `deaths.spec.js` | The four death causes and their message/image tables |
+| `ouroboros.spec.js` | The scaled bonus curve, the collapse, the free life, once-per-run |
+| `basilisk.spec.js` | Spawn geometry (sampled over repeated runs), the gaze death, the apple counter, outgazing |
+| `chain.spec.js` | Egg gating, both free lives, full-run score arithmetic, restart, leaderboard badges |
+| `regrow.spec.js` | The no-apple-while-regrowing rule, on all three collapse paths |
+
+The suite runs in CI as a gate on the deploy (see below), so a push that
+breaks the chain fails before it reaches Pages.
+
 ## Building
 
 ```
@@ -200,7 +229,8 @@ project.
 ## Deployment
 
 GitHub Pages, deployed via GitHub Actions
-(`.github/workflows/deploy.yml`) on every push to `main`: build with
+(`.github/workflows/deploy.yml`) on every push to `main`: run the
+Playwright suite first and stop there if it fails, then build with
 Vite, inject the `VITE_FIREBASE_*` vars from repository secrets, deploy
 `dist/` to Pages. The repo's Pages source must be set to "GitHub
 Actions" (Settings → Pages → Build and deployment), not "Deploy from a
@@ -253,6 +283,7 @@ and connects to the emulator instead of production.
 | `firestore.rules` | Security rules for the global leaderboard (see above) |
 | `firebase.json`, `.firebaserc` | Local emulator config for `firestore.rules` |
 | `vite.config.js` | Build config, including the `vite-plugin-pwa` manifest/icon setup |
+| `playwright.config.js`, `tests/` | End-to-end test config and specs (see above) |
 | `public/CNAME` | Custom domain for GitHub Pages |
 | `public/tab_icon.ico` | Favicon (no-gap pixel-art render, no eye detail - aliases into noise at 16-32px otherwise) |
 | `public/icon-192.png`, `public/icon-512.png`, `public/apple-touch-icon.png` | PWA/home-screen icons (segmented pixel-art render, with head/eye detail) |
