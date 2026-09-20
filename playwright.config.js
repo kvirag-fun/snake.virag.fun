@@ -26,11 +26,18 @@ export default defineConfig({
     // at the local emulator in dev and simply fails to connect when it
     // isn't running - harmless here, since nothing under test reads the
     // leaderboard from the network.
+    // Bind the dev server to 127.0.0.1 explicitly rather than letting it
+    // default to `localhost`: on CI runners that name can resolve to ::1
+    // first, and Playwright then waits out the whole timeout probing an
+    // IPv4 address nothing is listening on.
     webServer: {
-        command: 'vite --port 5173 --strictPort',
+        command: 'vite --host 127.0.0.1 --port 5173 --strictPort',
         url: 'http://127.0.0.1:5173',
         reuseExistingServer: !process.env.CI,
-        stdout: 'ignore',
-        timeout: 60_000,
+        // Piped, not ignored - if the server fails to start, its output is
+        // the only thing that says why.
+        stdout: 'pipe',
+        stderr: 'pipe',
+        timeout: 120_000,
     },
 });
