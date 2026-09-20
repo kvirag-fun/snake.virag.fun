@@ -126,8 +126,8 @@ can earn all three.
   visual - nothing stops the snake walking over a hole, and food can
   still land on one.
 
-  The encounter is **3 sequential stages** totalling
-  `BASILISK_TOTAL_FOOD` (20) apples, however they end up split - each
+  The encounter is **4 sequential stages** totalling
+  `BASILISK_TOTAL_FOOD` (25) apples, however they end up split - each
   stage needs at least `BASILISK_STAGE_MIN` (5), the remaining "slack"
   handed out randomly per run (`randomBasiliskStageQuotas()`), so the
   total is always exactly 20 but where the wall resets along the way
@@ -193,8 +193,8 @@ states. Everything else follows from which one it's in:
 | --- | --- | --- | --- |
 | Plain | run start | nothing - length does nothing, no wall | ` ♡ ♡ ` |
 | Ouroboros fired | bit your own tail tip | Basilisk spawns on your next swipe | ` ♥ ♡ ` |
-| Basilisk active | swiped to resume | outgaze it (3 stages, 20 apples total) or die to it | ` ♥ ♡ ` |
-| Basilisk outgazed | cleared all 3 stages | Jörmungandr, on a later food-eat | ` ♥ ♥ ` |
+| Basilisk active | swiped to resume | outgaze it (4 stages, 25 apples total) or die to it | ` ♥ ♡ ` |
+| Basilisk outgazed | cleared all 4 stages | Jörmungandr, on a later food-eat | ` ♥ ♥ ` |
 | Jörmungandr found | grew back past the length threshold | nothing left - run it out | ` ♥ ♥ ` |
 
 Rules that hold across every state:
@@ -224,7 +224,7 @@ Rules that hold across every state:
   a fresh apple is placed clear of the body. One check in `update()` and
   one in `drawGame()`, both keyed on that counter, so all four paths get
   it.
-  The point is the Basilisk: its 20 apples would otherwise be eaten
+  The point is the Basilisk: its 25 apples would otherwise be eaten
   while conveniently short, so this forces the fight at full length -
   you pay in difficulty for the free life it banks.
 - **Bonuses never affect difficulty.** Speed is driven by `pacingScore`,
@@ -277,7 +277,7 @@ silent no-op until it's dismissed.
 | --- | --- |
 | `deaths.spec.js` | The four death causes and their message/image tables |
 | `ouroboros.spec.js` | The scaled bonus curve, the collapse, the free life, once-per-run |
-| `basilisk.spec.js` | Spawn geometry (sampled over repeated runs), the gaze death, the apple counter, the 3-stage split and its randomisation, outgazing |
+| `basilisk.spec.js` | Spawn geometry (sampled over repeated runs), the gaze death, the apple counter, the 4-stage split and its randomisation, outgazing |
 | `chain.spec.js` | Egg gating, both free lives, full-run score arithmetic, restart, leaderboard badges |
 | `regrow.spec.js` | The no-apple-while-regrowing rule, on all three collapse paths |
 | `gates.spec.js` | The shared announcement overlay/gate - all four triggers, the badge emoji, golden rays on a life saved - driven through real touch and key events |

@@ -48,7 +48,7 @@ test('no apple can be eaten after outgazing the Basilisk', async ({ game }) => {
         const h = window.__game;
         h.fireOuroboros();
         h.dismissAndResume(1, 0);
-        h.eatApples(20);
+        h.eatApples(25);
         const collapsed = h.state();
         h.dismissAndResume(1, 0);
         const ate = h.tryToEatWhileRegrowing(5);

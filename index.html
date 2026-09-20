@@ -969,16 +969,17 @@
         const OUROBOROS_MAX_BONUS = 400;
 
         // Basilisk easter egg - see spawnBasilisk()/triggerBasiliskSurvived()
-        // below for the full mechanism. The encounter is 3 sequential
-        // stages (a new wall - new origin, same current heading - each
-        // time one clears) totalling BASILISK_TOTAL_FOOD apples, however
-        // they end up split: randomised per run at the first spawn, each
-        // stage getting at least BASILISK_STAGE_MIN, see
+        // below for the full mechanism. The encounter is 4 sequential
+        // stages (a new wall - new origin, recomputed from scratch against
+        // wherever the snake currently is - each time one clears)
+        // totalling BASILISK_TOTAL_FOOD apples, however they end up
+        // split: randomised per run at the first spawn, each stage
+        // getting at least BASILISK_STAGE_MIN, see
         // randomBasiliskStageQuotas(). The total is fixed regardless of
-        // the split, so outgazing it always takes exactly 20 apples -
+        // the split, so outgazing it always takes exactly 25 apples -
         // only where the wall resets along the way is unpredictable.
-        const BASILISK_TOTAL_FOOD = 20;
-        const BASILISK_STAGE_COUNT = 3;
+        const BASILISK_TOTAL_FOOD = 25;
+        const BASILISK_STAGE_COUNT = 4;
         const BASILISK_STAGE_MIN = 5;
         let basiliskTriggered = false;
         let basiliskActive = false;
@@ -1698,7 +1699,7 @@
                 // back to the old length. No apple exists during this
                 // stretch, so you have to re-earn your length by pure
                 // navigation before anything can be eaten: the Basilisk's
-                // 20 apples, across its 3 stages, are then fought at full
+                // 25 apples, across its 4 stages, are then fought at full
                 // size, not while conveniently short.
                 regrowPending--;
                 if (regrowPending === 0) {

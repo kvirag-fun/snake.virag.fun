@@ -246,7 +246,17 @@ test('the gate also covers the Basilisk life, not just Ouroboros', async ({ game
         const h = window.__game;
         h.fireOuroboros();
         h.dismissAndResume(1, 0);
-        h.eatApples(20);                    // banks the second life
+        h.eatApples(25);                    // banks the second life
+        // eatApples() sweeps rightward along whatever row the snake
+        // happened to land on - across 4 stages that row can coincide
+        // with an active wall's row/column (walls only ever run along 9
+        // or 11 - see basilisk.spec.js), silently forgiving a gaze death
+        // with Ouroboros's life mid-sweep and leaving only one life
+        // banked by the time we get here. Not what this test is about -
+        // it wants both lives genuinely available going into the two
+        // kills below, so restore it rather than let an unrelated
+        // pathing accident decide which two death causes get exercised.
+        ouroborosLifeAvailable = true;
         h.dismissAndResume(1, 0);
         h.killIntoWall();                   // spends Ouroboros's
         h.killIntoWall();                   // spends the Basilisk's
@@ -300,7 +310,7 @@ test('outgazing shows its own badge, Jörmungandr shows its own', async ({ game 
         const h = window.__game;
         h.fireOuroboros();
         h.dismissAndResume(1, 0);
-        h.eatApples(20);
+        h.eatApples(25);
         const basiliskBonus = specialOverlayBonusElement.textContent;
 
         h.dismissAndResume(1, 0);

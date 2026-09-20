@@ -1,19 +1,19 @@
 // Basilisk: spawns the instant you swipe to resume after Ouroboros, and
-// gazes a line of deadly tiles out to the board edge. Outgazed over 3
+// gazes a line of deadly tiles out to the board edge. Outgazed over 4
 // sequential stages (a new wall each time one clears - see
 // spawnBasilisk()/randomBasiliskStageQuotas() in index.html) totalling
-// 20 apples, however randomly they end up split across the stages.
+// 25 apples, however randomly they end up split across the stages.
 //
-// The origin is whichever of the 8 tiles surrounding board center sits
-// farthest (Manhattan distance) from the snake's head at spawn time - not
-// tied to the player's heading at all. A side tile (N/S/E/W) has only one
-// sensible growth direction, straight out along its own axis; a corner
-// tile has two, so which one it takes is a coin flip. Either way the wall
-// only ever grows away from center, so it can never fold back through the
-// exact center tile, where a forgiven death always respawns. A respawn
-// additionally never reappears at the tile it just vacated, and the whole
-// selection defers to snake-body safety first, falling back only when
-// nothing collision-free is left to offer.
+// The origin is always one of the 4 corner tiles surrounding board
+// center - whichever sits farthest (Manhattan distance) from the snake's
+// head at spawn time - not tied to the player's heading at all. Every
+// corner has two equally valid growth axes, so which one it takes is a
+// coin flip. Either way the wall only ever grows away from center, so it
+// can never fold back through the exact center tile, where a forgiven
+// death always respawns. A respawn additionally never reappears at the
+// tile it just vacated, and the whole selection defers to snake-body
+// safety first, falling back only when nothing collision-free is left to
+// offer.
 import { test, expect } from './helpers.js';
 
 const TRIALS = 120;
@@ -256,9 +256,9 @@ test('neither apple ever spawns on the gaze', async ({ game }) => {
     expect(collisions).toBe(0);
 });
 
-// ---- the 3-stage split -------------------------------------------------
+// ---- the 4-stage split -------------------------------------------------
 
-test('the encounter splits into 3 stages that always sum to 20, each at least 5', async ({ game }) => {
+test('the encounter splits into 4 stages that always sum to 25, each at least 5', async ({ game }) => {
     const samples = await game.evaluate((trials) => {
         const h = window.__game;
         const out = [];
@@ -271,8 +271,8 @@ test('the encounter splits into 3 stages that always sum to 20, each at least 5'
     }, TRIALS);
 
     for (const quotas of samples) {
-        expect(quotas).toHaveLength(3);
-        expect(quotas.reduce((a, b) => a + b, 0)).toBe(20);
+        expect(quotas).toHaveLength(4);
+        expect(quotas.reduce((a, b) => a + b, 0)).toBe(25);
         for (const q of quotas) expect(q).toBeGreaterThanOrEqual(5);
     }
     // More than one distinct split shows up - otherwise "randomised"
@@ -281,13 +281,13 @@ test('the encounter splits into 3 stages that always sum to 20, each at least 5'
     expect(distinct).toBeGreaterThan(1);
 });
 
-test('clearing a stage respawns the wall and resets the counter, until the third clears it for good', async ({ game }) => {
+test('clearing a stage respawns the wall and resets the counter, until the fourth clears it for good', async ({ game }) => {
     // "Respawns" means spawnBasilisk() genuinely runs again, not that the
-    // new wall is guaranteed to differ from the old one - it picks
-    // uniformly among up to 3 fixed candidates each time, so landing on
-    // the same one twice in a row is legitimate, not a bug. The reliable
-    // signal that a real respawn happened is the counter resetting to 0,
-    // which only spawnBasilisk() ever does.
+    // new wall is guaranteed to differ from the old one - the no-repeat
+    // guarantee only excludes the exact tile just vacated, so landing on
+    // one of the other 3 corners again later is legitimate, not a bug.
+    // The reliable signal that a real respawn happened is the counter
+    // resetting to 0, which only spawnBasilisk() ever does.
     const result = await game.evaluate(() => {
         const h = window.__game;
         h.fireOuroboros();
@@ -310,17 +310,25 @@ test('clearing a stage respawns the wall and resets the counter, until the third
 
         h.eatApples(quotas[2]);
         const afterStage3 = {
+            stage: basiliskStage,
+            active: basiliskActive,
+            counter: basiliskFoodCounter,
+        };
+
+        h.eatApples(quotas[3]);
+        const afterStage4 = {
             triggered: basiliskTriggered,
             active: basiliskActive,
             wallLength: basiliskWall.length,
         };
 
-        return { afterStage1, afterStage2, afterStage3 };
+        return { afterStage1, afterStage2, afterStage3, afterStage4 };
     });
 
     expect(result.afterStage1).toEqual({ stage: 2, active: true, counter: 0 });
     expect(result.afterStage2).toEqual({ stage: 3, active: true, counter: 0 });
-    expect(result.afterStage3).toEqual({ triggered: true, active: false, wallLength: 0 });
+    expect(result.afterStage3).toEqual({ stage: 4, active: true, counter: 0 });
+    expect(result.afterStage4).toEqual({ triggered: true, active: false, wallLength: 0 });
 });
 
 test('the wall does sometimes actually move between stages', async ({ game }) => {
@@ -344,7 +352,7 @@ test('the wall does sometimes actually move between stages', async ({ game }) =>
     expect(moved).toBe(true);
 });
 
-test('outgazing always takes exactly 20 apples, regardless of how the stages split', async ({ game }) => {
+test('outgazing always takes exactly 25 apples, regardless of how the stages split', async ({ game }) => {
     // 5 independent runs, each re-randomising the split via fireOuroboros().
     const outcomes = await game.evaluate((trials) => {
         const h = window.__game;
@@ -352,17 +360,17 @@ test('outgazing always takes exactly 20 apples, regardless of how the stages spl
         for (let i = 0; i < trials; i++) {
             h.fireOuroboros();
             h.dismissAndResume(1, 0);
-            h.eatApples(19);
-            const before20th = basiliskTriggered;
+            h.eatApples(24);
+            const before25th = basiliskTriggered;
             h.eatApples(1);
-            out.push({ before20th, after20th: basiliskTriggered });
+            out.push({ before25th, after25th: basiliskTriggered });
         }
         return out;
     }, 5);
 
-    for (const { before20th, after20th } of outcomes) {
-        expect(before20th).toBe(false);
-        expect(after20th).toBe(true);
+    for (const { before25th, after25th } of outcomes) {
+        expect(before25th).toBe(false);
+        expect(after25th).toBe(true);
     }
 });
 
@@ -575,23 +583,23 @@ test('the counter tracks apples eaten, not moves made', async ({ game }) => {
     expect(result.afterEating).toBe(result.afterRegrow + 2);
 });
 
-test('20 apples outgazes it: +400, second life, purple eyes, gold body', async ({ game }) => {
+test('25 apples outgazes it: +400, second life, purple eyes, gold body', async ({ game }) => {
     const result = await game.evaluate(() => {
         const h = window.__game;
         h.fireOuroboros();
         h.dismissAndResume(1, 0);
         const before = score;
-        const eaten = h.eatApples(20);
+        const eaten = h.eatApples(25);
         return { before, eaten, ...h.state() };
     });
-    expect(result.eaten).toBe(20);
+    expect(result.eaten).toBe(25);
     expect(result.basiliskTriggered).toBe(true);
     expect(result.basiliskActive).toBe(false);
     expect(result.basiliskWallLength).toBe(0);
-    // The 3-stage split is randomised, but it always totals
-    // BASILISK_TOTAL_FOOD apples regardless - so 20 at +10, plus the
+    // The 4-stage split is randomised, but it always totals
+    // BASILISK_TOTAL_FOOD apples regardless - so 25 at +10, plus the
     // flat +400 for outgazing it, every time.
-    expect(result.score).toBe(result.before + 200 + 400);
+    expect(result.score).toBe(result.before + 250 + 400);
     expect(result.basiliskLifeAvailable).toBe(true);
     // The encounter is fully over - nothing left mid-stage.
     expect(result.basiliskStage).toBe(0);
@@ -606,7 +614,7 @@ test('outgazing collapses the snake to a single tile as well', async ({ game }) 
         const h = window.__game;
         h.fireOuroboros();
         h.dismissAndResume(1, 0);
-        h.eatApples(20);
+        h.eatApples(25);
         return h.state();
     });
     expect(state.length).toBe(1);
@@ -618,9 +626,9 @@ test('its bonus does not speed the game up either', async ({ game }) => {
         const h = window.__game;
         h.fireOuroboros();
         h.dismissAndResume(1, 0);
-        h.eatApples(20);
+        h.eatApples(25);
         return h.state();
     });
-    // Only the 20 real apples count towards pace; both bonuses don't.
-    expect(state.pacingScore).toBe(200);
+    // Only the 25 real apples count towards pace; both bonuses don't.
+    expect(state.pacingScore).toBe(250);
 });

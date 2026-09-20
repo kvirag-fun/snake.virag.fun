@@ -49,7 +49,7 @@ test('once the Basilisk is beaten it fires on a food-eat, not on a plain move', 
         const h = window.__game;
         h.fireOuroboros();
         h.dismissAndResume(1, 0);
-        h.eatApples(20);                   // outgaze the Basilisk
+        h.eatApples(25);                   // outgaze the Basilisk
         h.dismissAndResume(1, 0);
 
         // At threshold length but not eating: nothing happens.
@@ -85,7 +85,7 @@ test('both free lives can be banked at once and are spent oldest first', async (
         const h = window.__game;
         h.fireOuroboros();
         h.dismissAndResume(1, 0);
-        h.eatApples(20);                   // banks the Basilisk's life too
+        h.eatApples(25);                   // banks the Basilisk's life too
         h.dismissAndResume(1, 0);
         const banked = {
             ouroboros: ouroborosLifeAvailable,
@@ -120,7 +120,7 @@ test('a full run adds up exactly, and none of the bonuses touch the pace', async
         h.fireOuroboros();                 // +80 at length 8
         const ouroborosBonus = score;
         h.dismissAndResume(1, 0);
-        h.eatApples(20);                   // +200 apples, +400 outgaze
+        h.eatApples(25);                   // +250 apples, +400 outgaze
         h.dismissAndResume(1, 0);
         const beforeGrowing = score;
 
@@ -146,11 +146,11 @@ test('a full run adds up exactly, and none of the bonuses touch the pace', async
     expect(result.jormungandrTriggered).toBe(true);
     expect(result.ouroborosBonus).toBe(80);
     expect(result.score).toBe(
-        80 + 200 + 400 + result.applesWhileGrowing * 10 + 1000
+        80 + 250 + 400 + result.applesWhileGrowing * 10 + 1000
     );
-    // Difficulty is driven by apples alone: 20 + however many it took to
+    // Difficulty is driven by apples alone: 25 + however many it took to
     // grow back to the Jörmungandr threshold.
-    expect(result.pacingScore).toBe((20 + result.applesWhileGrowing) * 10);
+    expect(result.pacingScore).toBe((25 + result.applesWhileGrowing) * 10);
 });
 
 test('restarting clears every egg, life and colour', async ({ game }) => {
@@ -158,7 +158,7 @@ test('restarting clears every egg, life and colour', async ({ game }) => {
         const h = window.__game;
         h.fireOuroboros();
         h.dismissAndResume(1, 0);
-        h.eatApples(20);
+        h.eatApples(25);
         h.reset();
         return h.state();
     });
