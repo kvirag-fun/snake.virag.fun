@@ -1045,6 +1045,9 @@
 
         splashImage.onload = () => {
             splashLoaded = true;
+            // The game-over art queues up behind this - see
+            // scheduleGameOverImages() below for why it waits.
+            scheduleGameOverImages();
         };
         splashImage.src = 'snake_splash_screen.png';
 
@@ -1063,14 +1066,50 @@
         let showGameOverImage = false;
 
         for (const cause of Object.keys(GAME_OVER_SOURCES)) {
-            const image = new Image();
             gameOverLoaded[cause] = false;
-            image.onload = () => {
-                gameOverLoaded[cause] = true;
-            };
-            image.src = GAME_OVER_SOURCES[cause];
-            gameOverImages[cause] = image;
+            gameOverImages[cause] = new Image();
         }
+
+        // These four are only ever needed once a run has ended, so they
+        // deliberately don't compete with the splash: four images the
+        // player can't see yet used to be most of what the page
+        // downloaded before it could show anything.
+        //
+        // The trigger is the splash finishing, not an idle callback on its
+        // own - requestIdleCallback fires when the main thread is idle,
+        // which on a slow connection is precisely while the splash is
+        // still in flight, so it would queue all four straight into the
+        // same contention it's meant to avoid. Waiting for the splash
+        // guarantees the one image that's actually on screen wins the
+        // race; a timer covers the case where the splash never arrives.
+        // drawGame() falls back to the splash for any cause that hasn't
+        // loaded, so being late shows the wrong picture at worst, never a
+        // blank one.
+        let gameOverImagesRequested = false;
+
+        function loadGameOverImages() {
+            if (gameOverImagesRequested) return;
+            gameOverImagesRequested = true;
+            for (const cause of Object.keys(GAME_OVER_SOURCES)) {
+                const image = gameOverImages[cause];
+                image.onload = () => {
+                    gameOverLoaded[cause] = true;
+                };
+                image.src = GAME_OVER_SOURCES[cause];
+            }
+        }
+
+        function scheduleGameOverImages() {
+            if (typeof requestIdleCallback === 'function') {
+                requestIdleCallback(loadGameOverImages, { timeout: 2000 });
+            } else {
+                setTimeout(loadGameOverImages, 200);
+            }
+        }
+
+        // Whichever comes first: the splash landing, or a timeout in case
+        // it errors out and its onload never runs.
+        setTimeout(loadGameOverImages, 5000);
 
         // Distinguishes the 4 ways a run can end - set by gameOver(), read
         // by drawGame() (which image/message to show) and restart() (cleared

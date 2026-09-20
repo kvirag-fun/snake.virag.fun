@@ -301,4 +301,14 @@ and connects to the emulator instead of production.
 | `public/icon-192.png`, `public/icon-512.png`, `public/apple-touch-icon.png` | PWA/home-screen icons (segmented pixel-art render, with head/eye detail) |
 | `public/snake_splash_screen.png` | Splash screen shown before a run starts |
 | `public/snake_gameover_wall.png`, `public/snake_gameover_self.png`, `public/snake_gameover_rotten.png`, `public/snake_gameover_gaze.png` | Game-over screens, one per death cause (`gaze`'s snake is the same art, recolored stone-gray) |
+
+All five canvas images are stored at **400x400**, matching the canvas's
+fixed backing store (`<canvas width="400" height="400">`, no
+device-pixel-ratio scaling) - anything larger is downscaled by
+`drawFitted()` and thrown away. They were 1024x1024 until that was
+measured: on a 400kbps connection the splash took **36s** to appear
+because 1.6MB of art, four images of it not yet visible, was being
+fetched before anything could render. At 400x400, with the game-over
+art deferred until the splash has landed, the same test shows the
+splash in **6s**. Don't re-export them larger.
 | `public/food.mp3`, `public/ugh_05s.mp3` | Sound effects (eating food, game over) |
