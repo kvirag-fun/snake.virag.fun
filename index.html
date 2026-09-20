@@ -2272,10 +2272,10 @@
         // a swipe" complaint). That's not fixable by waiting for
         // touchend - the design deliberately resolves mid-swipe instead,
         // see the comment above the touchmove listener - so 20 was raised
-        // to 28: still comfortably below every genuine swipe distance
+        // to 26: still comfortably below every genuine swipe distance
         // this game expects, but past the range where lift-off jitter
         // alone was crossing it.
-        const minSwipeDistance = 28;
+        const minSwipeDistance = 26;
 
         function isFormControl(target) {
             return target.closest('select, input, label, #infoOverlay, #infoButton, #nicknameOverlay') !== null;
