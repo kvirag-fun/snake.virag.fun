@@ -1901,9 +1901,9 @@
         // callers: triggerOuroboros(), respawnWithSameLength(),
         // triggerBasiliskSurvived(), the Jörmungandr food-eat branch in
         // update()). `bonus` is '' for the life-saved case, which has no
-        // points to show - the bonus line is hidden entirely rather than
-        // left as an empty gap, and with nothing to hang it on, no emoji
-        // is appended either.
+        // points to show - the middle line still carries the kind's own
+        // emoji, just without a number attached, rather than showing
+        // nothing at all.
         function beginSpecialEvent(kind, title, bonus) {
             dx = 0;
             dy = 0;
@@ -1912,8 +1912,9 @@
             specialEventWaiting = true;
             specialEventOverlayDismissed = false;
             specialOverlayTitleElement.textContent = title;
-            specialOverlayBonusElement.textContent = bonus ? `${bonus} ${ANNOUNCEMENT_EMOJI[kind]}` : '';
-            specialOverlayBonusElement.hidden = !bonus;
+            specialOverlayBonusElement.textContent = bonus
+                ? `${bonus} ${ANNOUNCEMENT_EMOJI[kind]}`
+                : ANNOUNCEMENT_EMOJI[kind];
             specialOverlayElement.hidden = false;
         }
 

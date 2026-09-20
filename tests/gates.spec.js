@@ -92,8 +92,10 @@ test('a forgiven death shows the "Saved by Ouroboros!" announcement', async ({ g
     expect(state.specialEventKind).toBe('ouroboros');
     await expect(game.locator('#specialOverlay')).toBeVisible();
     await expect(game.locator('#specialOverlayTitle')).toHaveText('Saved by Ouroboros!');
-    // No points for being saved - the bonus line is hidden, not just empty.
-    await expect(game.locator('#specialOverlayBonus')).toBeHidden();
+    // No points for being saved, but the badge still shows - just the
+    // emoji, with no number attached.
+    await expect(game.locator('#specialOverlayBonus')).toBeVisible();
+    await expect(game.locator('#specialOverlayBonus')).toHaveText('♾️');
     expect(await tryToMove(game)).toBe(false);
 });
 
