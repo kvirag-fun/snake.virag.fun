@@ -28,6 +28,20 @@ installable as a PWA. Live at
   splash screen shown before a run starts.
 - **Double-tap to restart** on touch devices, `R` on keyboard.
 
+## Board size
+
+The board is **21x21** tiles (`tileCount`, derived from the canvas's
+pixel size divided by `gridSize`, both in `index.html`) - odd on
+purpose, so `centerX`/`centerY` (`Math.floor(tileCount / 2)` = 10) land
+on the board's actual geometric middle rather than one of the four tiles
+around it, the way an even-sized board always leaves ambiguous. Grown
+from an original 20x20 (canvas `400x400` → `420x420`, `gridSize` itself
+unchanged at 20px/tile) - see the game-over art note under
+[Files](#files) below for the one visual side effect (a 5% upscale on
+the four death-screen images), and `firestore.rules`' leaderboard score
+cap, which is sized off the total tile count and was raised accordingly.
+If it ever grows further, check both of those again.
+
 ## Fairytales
 
 Three hidden, mythology-themed easter eggs, each firing once per run,
@@ -341,18 +355,21 @@ and connects to the emulator instead of production.
 | `public/snake_splash_screen.png` | Splash screen shown before a run starts |
 | `public/snake_gameover_wall.png`, `public/snake_gameover_self.png`, `public/snake_gameover_rotten.png`, `public/snake_gameover_gaze.png` | Game-over screens, one per death cause (`gaze`'s snake is the same art, recolored stone-gray) |
 
-All five canvas images are stored at **400x400**, matching the canvas's
-fixed backing store (`<canvas width="400" height="400">`, no
-device-pixel-ratio scaling) - anything larger is downscaled by
-`drawFitted()` and thrown away. They were 1024x1024 until that was
+All five canvas images are stored at **400x400** - originally an exact
+match for the canvas's fixed backing store, before it grew to
+`<canvas width="420" height="420">` (see "Board size" below);
+`drawFitted()` scales any image to fit whatever the canvas's current
+size is (centered, aspect-preserved), so the 400x400 art still renders
+correctly at 420x420, just very slightly upscaled (5%, not worth
+re-exporting for on its own). They were 1024x1024 until that was
 measured: on a 400kbps connection the splash took **36s** to appear
 because 1.6MB of art, four images of it not yet visible, was being
 fetched before anything could render. At 400x400, with the game-over
 art deferred until the splash has landed, the same test shows the
-splash in **6s**. Don't re-export them larger.
+splash in **6s**. Don't re-export them larger without re-measuring that.
 
 The pre-resize 1024x1024 originals are kept in `art-src/` (not built or
-deployed - Vite only serves `public/`) in case the canvas ever grows
-past 400x400 and the art needs re-exporting at a larger size, so no one
-has to go digging through git history for them.
+deployed - Vite only serves `public/`) in case the canvas grows enough
+that the upscale becomes noticeable and the art needs re-exporting at a
+larger size, so no one has to go digging through git history for them.
 | `public/food.mp3`, `public/ugh_05s.mp3` | Sound effects (eating food, game over) |

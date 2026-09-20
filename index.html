@@ -618,7 +618,7 @@
 
         <!-- Game canvas -->
         <div class="canvas-frame corner-ticks">
-            <canvas id="gameCanvas" width="400" height="400"></canvas>
+            <canvas id="gameCanvas" width="420" height="420"></canvas>
             <div id="gameOverTop" class="game-over-overlay game-over-top" hidden></div>
             <div id="gameOverBottom" class="game-over-overlay game-over-bottom">Double-tap or press R to restart.</div>
             <!-- One overlay for all four announcements - Ouroboros
@@ -955,8 +955,8 @@
         // wait is already in progress.
         let ouroborosTriggered = false;
         let jormungandrTriggered = false;
-        // TEMPORARY for testing the "free life" rework - reinstate 80
-        // (20% of the 20x20 board) once confirmed working.
+        // TEMPORARY for testing the "free life" rework - reinstate ~88
+        // (20% of the 21x21 board, 441 tiles) once confirmed working.
         const JORMUNGANDR_LENGTH = 15;
 
         // Ouroboros can be triggered at any length (4 is the theoretical

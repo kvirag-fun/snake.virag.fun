@@ -6,7 +6,7 @@ import { test, expect } from './helpers.js';
 test('running into a wall ends the run', async ({ game }) => {
     const state = await game.evaluate(() => {
         const h = window.__game;
-        h.setSnake([{ x: 19, y: 10 }]);
+        h.setSnake([{ x: tileCount - 1, y: 10 }]);
         dx = 1;
         dy = 0;
         h.step();

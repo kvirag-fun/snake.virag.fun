@@ -46,7 +46,7 @@ test('each candidate wall is a straight line from its origin, growing away from 
             spawnBasilisk();
             walls.push(basiliskWall.map((s) => ({ x: s.x, y: s.y })));
         }
-        return { walls, centerX, centerY };
+        return { walls, centerX, centerY, tileCount };
     }, TRIALS);
 
     for (const wall of result.walls) {
@@ -62,7 +62,7 @@ test('each candidate wall is a straight line from its origin, growing away from 
         const last = wall[wall.length - 1];
         const nextX = last.x + dir.x;
         const nextY = last.y + dir.y;
-        expect(nextX < 0 || nextX >= 20 || nextY < 0 || nextY >= 20).toBe(true);
+        expect(nextX < 0 || nextX >= result.tileCount || nextY < 0 || nextY >= result.tileCount).toBe(true);
         // Grows away from center: the wall's one nonzero axis points the
         // same way the origin is already offset from center on that axis.
         if (dir.x !== 0) expect(Math.sign(dir.x)).toBe(Math.sign(origin.x - result.centerX));
