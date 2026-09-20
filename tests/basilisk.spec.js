@@ -251,12 +251,14 @@ test('outgazing always takes exactly 20 apples, regardless of how the stages spl
     }
 });
 
-test('a later stage avoids spawning its wall through the current snake body', async ({ game }) => {
+test('the first spawn avoids spawning its wall through the current snake body', async ({ game }) => {
     // Isolate the body check from the pre-existing row/column check: the
     // head sits on a row none of the 3 heading-right candidates use, but
     // a lone body segment sits directly on one candidate's line - only a
     // check against the whole body, not just the head's row, would catch
-    // that one.
+    // that one. Calls spawnBasilisk() with no previousOrigin, i.e. the
+    // first-spawn path (3 heading-side candidates) - see the respawn
+    // versions of this below, which exercise the other path.
     const result = await game.evaluate((trials) => {
         const centerX = Math.floor(tileCount / 2);
         const centerY = Math.floor(tileCount / 2);
@@ -310,6 +312,110 @@ test('falls back to a row/column-safe candidate if every one collides with the b
     });
     expect(result.active).toBe(true);
     expect(result.wallLength).toBeGreaterThan(0);
+});
+
+// ---- a respawn (stage 2 or 3) picks from all 8, never repeats --------
+
+test('a respawn can originate from any of the 8 tiles, not just the 3 on the heading side', async ({ game }) => {
+    // A previousOrigin far outside the 8 real candidates excludes
+    // nothing on its own, isolating just the pool-widening part of a
+    // respawn from the no-repeat guarantee.
+    const sides = await game.evaluate((trials) => {
+        const centerX = Math.floor(tileCount / 2);
+        const centerY = Math.floor(tileCount / 2);
+        const seen = new Set();
+        for (let i = 0; i < trials; i++) {
+            snake = [{ x: 5, y: 5 }];
+            dx = 1;
+            dy = 0;
+            spawnBasilisk(1, 0, { x: -99, y: -99 });
+            const origin = basiliskWall[0];
+            seen.add(`${origin.x - centerX},${origin.y - centerY}`);
+        }
+        return [...seen];
+    }, TRIALS);
+
+    // The first spawn's pool is only the 3 offsets with x === 1 (heading
+    // right): 1,-1 / 1,0 / 1,1. Seeing anything outside that set proves
+    // a respawn really does draw from all 8, not just those 3.
+    const headingSideOnly = new Set(['1,-1', '1,0', '1,1']);
+    expect(sides.some((s) => !headingSideOnly.has(s))).toBe(true);
+});
+
+test('a respawn never reappears at the tile it just vacated', async ({ game }) => {
+    // Direct, repeated calls rather than real play: each iteration
+    // respawns off of the previous call's own origin, so this checks the
+    // no-repeat guarantee in isolation, independent of how update()
+    // wires it up (that's covered by the in-play test below).
+    const repeats = await game.evaluate((trials) => {
+        const centerX = Math.floor(tileCount / 2);
+        const centerY = Math.floor(tileCount / 2);
+        let count = 0;
+        for (let i = 0; i < trials; i++) {
+            snake = [{ x: 5, y: 5 }];
+            dx = 1;
+            dy = 0;
+            spawnBasilisk(1, 0);                       // first spawn, establishes an origin
+            const previous = { ...basiliskWall[0] };
+            spawnBasilisk(1, 0, previous);              // respawn off of it
+            if (basiliskWall[0].x === previous.x && basiliskWall[0].y === previous.y) count++;
+        }
+        return count;
+    }, TRIALS);
+    expect(repeats).toBe(0);
+});
+
+test('clearing a stage in real play never respawns the wall at the same tile', async ({ game }) => {
+    // The update()-wired version: basiliskWall[0] is read as an argument
+    // before spawnBasilisk() overwrites it, so this exercises that
+    // ordering directly, not just the function in isolation.
+    const repeats = await game.evaluate((trials) => {
+        const h = window.__game;
+        let count = 0;
+        for (let i = 0; i < trials; i++) {
+            h.fireOuroboros();
+            h.dismissAndResume(1, 0);
+            const firstOrigin = { ...basiliskWall[0] };
+            h.eatApples(basiliskStageQuotas[0]);         // clears stage 1 -> respawns
+            if (basiliskWall[0].x === firstOrigin.x && basiliskWall[0].y === firstOrigin.y) count++;
+        }
+        return count;
+    }, TRIALS);
+    expect(repeats).toBe(0);
+});
+
+test("a respawn's body-safety check also covers the wider 8-tile pool", async ({ game }) => {
+    // Heading right, so the first-spawn pool would only ever be the 3
+    // right-side candidates ({x:1,...}) - {x:0,y:-1} ("north side") isn't
+    // among them at all, so only a respawn (which can pick it) has any
+    // reason to avoid it, and only a check over the full pool would
+    // catch it. Its wall runs from (centerX, centerY-1) rightward, so a
+    // body segment anywhere on that row, right of center, blocks it -
+    // along with the two corner candidates that share the same row.
+    const result = await game.evaluate((trials) => {
+        const centerX = Math.floor(tileCount / 2);
+        const centerY = Math.floor(tileCount / 2);
+        let collisions = 0;
+        let sawNorthRow = false;
+        for (let i = 0; i < trials; i++) {
+            snake = [
+                { x: 5, y: 5 },
+                { x: centerX + 3, y: centerY - 1 },   // on the {0,-1} candidate's row
+            ];
+            dx = 1;
+            dy = 0;
+            spawnBasilisk(1, 0, { x: -99, y: -99 });   // respawn pool (far previousOrigin excludes nothing)
+            if (basiliskWall[0].y === centerY - 1) sawNorthRow = true;
+            if (basiliskWall.some((seg) => snake.some((s) => s.x === seg.x && s.y === seg.y))) {
+                collisions++;
+            }
+        }
+        return { collisions, sawNorthRow };
+    }, TRIALS);
+    expect(result.collisions).toBe(0);
+    // Confirms that row really was among the offered candidates (just
+    // never the one actually picked, thanks to the body block).
+    expect(result.sawNorthRow).toBe(false);
 });
 
 test('touching the gaze is its own death cause', async ({ game }) => {

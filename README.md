@@ -110,13 +110,20 @@ can earn all three.
   total is always exactly 20 but where the wall resets along the way
   isn't. Not raw moves - circling in place can't clear a stage for
   free, you have to actually keep eating. Clearing stage 1 or 2 doesn't
-  pause anything; the wall just respawns at a new origin (same
-  geometry rules as the first spawn, but using wherever the snake and
-  its current heading are by then, not necessarily center - and also
-  now checked against the whole current body, not just its row/column,
-  since by a later stage the snake is no longer freshly collapsed and
-  short the way it is on the very first spawn) and the apple count for
-  that stage starts over at 0. Only clearing the third stage is the
+  pause anything; the wall just respawns and the apple count for that
+  stage starts over at 0. A respawn's origin can be **any of the 8**
+  tiles surrounding center - not just the 3 on the current heading's
+  side the first spawn is limited to, since that first-look "never a
+  surprise, it only extends the path you're already on" reasoning
+  (see below) has already done its job by then - but is guaranteed
+  never to reappear at the tile it just vacated, so "respawns" always
+  means somewhere new. Whichever tile it picks, the wall still extends
+  along the snake's current heading from there, and it's checked
+  against the whole current body, not just its row/column, since by a
+  later stage the snake is no longer freshly collapsed and short the
+  way it is on the very first spawn - it may have grown enough to
+  genuinely pass near center, where every candidate originates. Only
+  clearing the third stage is the
   achievement: same pause/rays treatment as Ouroboros, right down to
   collapsing to a single tile and regrowing back out one tile per move
   once play resumes (`regrowPending`), and banking its own **free
