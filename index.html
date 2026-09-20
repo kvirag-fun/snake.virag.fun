@@ -1906,12 +1906,27 @@
                 return wall;
             };
 
+            // Shuffled before sorting by distance - Array.prototype.sort is
+            // stable, so without this, a tie (the head sitting exactly on
+            // the center row or column, where two candidates on opposite
+            // sides are equidistant) would always resolve the same way,
+            // toward whichever offset happens to come first in
+            // BASILISK_SPAWN_OFFSETS - a hidden, silent bias rather than a
+            // genuine coin flip. Shuffling a copy first means a tie's
+            // relative order (and so which one `.sort()` keeps in front)
+            // is random instead.
+            const shuffled = [...BASILISK_SPAWN_OFFSETS];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+
             // Every candidate, its (possibly random) direction, its full
             // wall line, and its distance from the current head - built
             // once so the direction stays fixed per candidate throughout
             // the filtering below, and sorted farthest-first so "pick the
             // one furthest from head" just means "take the first survivor".
-            const all = BASILISK_SPAWN_OFFSETS.map((o) => {
+            const all = shuffled.map((o) => {
                 const dir = directionFor(o);
                 return {
                     origin: { x: centerX + o.x, y: centerY + o.y },

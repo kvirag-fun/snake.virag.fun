@@ -131,6 +131,32 @@ test('it never originates on the tile a forgiven death respawns you on', async (
     expect(result.offBy).toBe(0);
 });
 
+test('a head exactly on the center column ties two opposite corners, and the tie is broken randomly', async ({ game }) => {
+    // head.x === centerX makes the left and right corner candidates
+    // exactly equidistant (e.g. bottom-left and bottom-right both sit
+    // |1| away in x from a head on the column between them). Without
+    // shuffling the candidates before the distance sort, a stable sort
+    // always resolves a tie the same way - toward whichever offset
+    // happens to come first in BASILISK_SPAWN_OFFSETS - which would
+    // silently and predictably favor one side forever, not a genuine
+    // coin flip.
+    const origins = await game.evaluate((trials) => {
+        const centerX = Math.floor(tileCount / 2);
+        const seen = new Set();
+        for (let i = 0; i < trials; i++) {
+            snake = [{ x: centerX, y: 0 }];
+            spawnBasilisk();
+            const origin = basiliskWall[0];
+            seen.add(`${origin.x},${origin.y}`);
+        }
+        return [...seen];
+    }, TRIALS);
+    // Order-independent: `.sort()` on strings is lexicographic, not
+    // numeric, so "11,11" < "9,11" - a fixed literal array would be an
+    // easy way to silently assert the wrong thing here.
+    expect(new Set(origins)).toEqual(new Set(['9,11', '11,11']));
+});
+
 test("a corner origin's growth axis is a coin flip", async ({ game }) => {
     // Head far in the top-left corner of the board: the bottom-right
     // spawn candidate (a corner tile) is then the unique farthest one on
@@ -338,30 +364,42 @@ test('the first spawn avoids spawning its wall through the current snake body', 
 
     expect(result.collisions).toBe(0);
     expect(result.stillPickedBlocked).toBe(0);
-    // Falls to a single deterministic next-best tile here - see the
-    // fallback-direction test below, not "any of several".
-    expect(result.originsSeen).toEqual(['10,11']);
+    // The two next-best tiles are genuinely tied at this distance (see the
+    // fallback-direction test below) - candidates are shuffled before the
+    // distance sort specifically so a tie like this doesn't silently
+    // always resolve to the same one, so both should show up here.
+    expect(new Set(result.originsSeen)).toEqual(new Set(['10,11', '11,10']));
 });
 
 test("a fallback side-tile origin's growth axis is fixed, not a coin flip", async ({ game }) => {
     // Same forced-fallback setup as the body-safety test above: with the
-    // bottom-right corner blocked, the tie-break among the remaining
-    // candidates always lands on the same side tile - which, unlike a
-    // corner, has only one valid growth axis (see directionFor() in
-    // index.html), so unlike the corner coin flip this should never vary.
-    const dirs = await game.evaluate((trials) => {
+    // bottom-right corner blocked, the two remaining side tiles are tied
+    // for next-best and which one wins is randomised (see the shuffle in
+    // spawnBasilisk()) - but unlike the corner coin flip, each side tile
+    // individually has only one valid growth axis (see directionFor() in
+    // index.html), so whichever one wins, *that* origin's direction
+    // should never vary.
+    const result = await game.evaluate((trials) => {
         const centerX = Math.floor(tileCount / 2);
         const centerY = Math.floor(tileCount / 2);
-        const seen = new Set();
+        const dirsByOrigin = new Map();
         for (let i = 0; i < trials; i++) {
             snake = [{ x: 0, y: 0 }, { x: centerX + 1, y: centerY + 1 }];
             spawnBasilisk();
             const [a, b] = basiliskWall;
-            seen.add(`${b.x - a.x},${b.y - a.y}`);
+            const originKey = `${a.x},${a.y}`;
+            const dirKey = `${b.x - a.x},${b.y - a.y}`;
+            if (!dirsByOrigin.has(originKey)) dirsByOrigin.set(originKey, new Set());
+            dirsByOrigin.get(originKey).add(dirKey);
         }
-        return [...seen];
+        return [...dirsByOrigin].map(([origin, dirs]) => [origin, [...dirs]]);
     }, TRIALS);
-    expect(dirs).toEqual(['0,1']);
+
+    // Both tied side tiles show up (the randomised part)...
+    expect(new Set(result.map(([origin]) => origin))).toEqual(new Set(['10,11', '11,10']));
+    // ...but each one, individually, only ever grew one way (the fixed
+    // part - contrast with the corner coin-flip test above).
+    for (const [, dirs] of result) expect(dirs).toHaveLength(1);
 });
 
 test('falls back to an unsafe candidate only when every one collides with the body', async ({ game }) => {
