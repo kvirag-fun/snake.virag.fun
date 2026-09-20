@@ -71,9 +71,11 @@ test('once the Basilisk is beaten it fires on a food-eat, not on a plain move', 
     expect(result.afterPlainMove).toBe(false);
     expect(result.jormungandrTriggered).toBe(true);
     expect(result.score).toBe(result.scoreBefore + 10 + 1000);
-    // Unlike the other two, Jörmungandr leaves the length alone.
-    expect(result.length).toBe(result.lengthBefore + 1);
-    expect(result.regrowPending).toBe(0);
+    // Same collapse/regrow treatment as Ouroboros and the Basilisk: back
+    // down to a single tile, regrowing out to the length it had just
+    // grown to (the food-eat that triggered this already grew it by 1).
+    expect(result.length).toBe(1);
+    expect(result.regrowPending).toBe(result.lengthBefore + 1 - 1);
     // Teal overrides Ouroboros's gold.
     expect(result.snakeColorMode).toBe('jormungandr');
 });

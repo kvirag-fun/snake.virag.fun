@@ -147,13 +147,16 @@ can earn all three.
   crossing the length threshold, via food or an Ouroboros regrow, while
   the Basilisk's wall is still up - can't chain the two pauses back to
   back with no real play in between). Ouroboros's free life, if still
-  banked, carries through unaffected, and so does an in-progress regrow
-  if this fires mid-regrow after an Ouroboros collapse - Jörmungandr
-  doesn't touch the snake's length or position at all. Pause/rays/color
-  otherwise the same treatment as Ouroboros, just teal instead of gold
-  and a flat +1000 (unlike Ouroboros's scaled bonus - there's nothing
-  to game here, since it already requires a substantial length to
-  reach). Leaderboard entries get a 🐉 badge.
+  banked, carries through unaffected. Same collapse/regrow treatment as
+  Ouroboros and outgazing the Basilisk: down to a single tile wherever
+  the snake currently is, regrowing back out one tile per move
+  (`regrowPending`) once play resumes - since this can only ever fire
+  once regrowPending is already back to 0 (the food-eat gate above), it
+  never collides with an in-progress regrow from one of those two.
+  Pause/rays/color otherwise the same treatment as Ouroboros, just teal
+  instead of gold and a flat +1000 (unlike Ouroboros's scaled bonus -
+  there's nothing to game here, since it already requires a substantial
+  length to reach). Leaderboard entries get a 🐉 badge.
 
 Ouroboros and Jörmungandr each set the snake's color (gold, then teal
 once both have fired); outgazing the Basilisk never does, so it can't
@@ -195,11 +198,12 @@ Rules that hold across every state:
   sets off before you've found where it landed, throwing away the life
   you just earned.
 - **No apple exists while the snake is regrowing.** Whichever of the
-  three collapses put it back to a single tile - the Ouroboros bite, a
-  forgiven death, or outgazing the Basilisk - no food is drawn or
-  eatable until `regrowPending` hits 0, at which point a fresh apple is
-  placed clear of the body. One check in `update()` and one in
-  `drawGame()`, both keyed on that counter, so all three paths get it.
+  four collapses put it back to a single tile - the Ouroboros bite, a
+  forgiven death, outgazing the Basilisk, or finding Jörmungandr - no
+  food is drawn or eatable until `regrowPending` hits 0, at which point
+  a fresh apple is placed clear of the body. One check in `update()` and
+  one in `drawGame()`, both keyed on that counter, so all four paths get
+  it.
   The point is the Basilisk: its 20 apples would otherwise be eaten
   while conveniently short, so this forces the fight at full length -
   you pay in difficulty for the free life it banks.
