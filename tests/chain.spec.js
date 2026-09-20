@@ -86,6 +86,16 @@ test('both free lives can be banked at once and are spent oldest first', async (
         h.fireOuroboros();
         h.dismissAndResume(1, 0);
         h.eatApples(25);                   // banks the Basilisk's life too
+        // eatApples() sweeps rightward along whatever row the snake
+        // happened to land on - across 4 stages that row can coincide
+        // with an active wall's row/column (walls only ever run along 9
+        // or 11 - see basilisk.spec.js), silently forgiving a gaze death
+        // with Ouroboros's life mid-sweep. Not what this test is about -
+        // it wants both lives genuinely available going into the three
+        // kills below, so restore it rather than let an unrelated
+        // pathing accident decide which death causes get exercised (see
+        // the identical fix in gates.spec.js's Basilisk-life gate test).
+        ouroborosLifeAvailable = true;
         h.dismissAndResume(1, 0);
         const banked = {
             ouroboros: ouroborosLifeAvailable,
