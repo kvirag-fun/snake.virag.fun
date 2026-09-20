@@ -101,13 +101,26 @@ can earn all three.
   cause - "You gazed into the Basilisk's eyes," with a game-over screen
   showing the snake turned to stone (same art as the other game-over
   screens, just recolored gray) - still forgiven by a banked free life
-  (either one), same as any other death. The wall stays up until 15 apples have been eaten since
-  it spawned (`BASILISK_FOOD_COUNT`) - not 15 raw moves, so circling in
-  place can't clear it for free, you have to actually keep playing.
-  Surviving to see it clear is the achievement: same pause/rays
-  treatment as Ouroboros, right down to collapsing to a single tile and
-  regrowing back out one tile per move once play resumes (`regrowPending`),
-  and banking its own **free life** - the second heart next to the score,
+  (either one), same as any other death.
+
+  The encounter is **3 sequential stages** totalling
+  `BASILISK_TOTAL_FOOD` (20) apples, however they end up split - each
+  stage needs at least `BASILISK_STAGE_MIN` (5), the remaining "slack"
+  handed out randomly per run (`randomBasiliskStageQuotas()`), so the
+  total is always exactly 20 but where the wall resets along the way
+  isn't. Not raw moves - circling in place can't clear a stage for
+  free, you have to actually keep eating. Clearing stage 1 or 2 doesn't
+  pause anything; the wall just respawns at a new origin (same
+  geometry rules as the first spawn, but using wherever the snake and
+  its current heading are by then, not necessarily center - and also
+  now checked against the whole current body, not just its row/column,
+  since by a later stage the snake is no longer freshly collapsed and
+  short the way it is on the very first spawn) and the apple count for
+  that stage starts over at 0. Only clearing the third stage is the
+  achievement: same pause/rays treatment as Ouroboros, right down to
+  collapsing to a single tile and regrowing back out one tile per move
+  once play resumes (`regrowPending`), and banking its own **free
+  life** - the second heart next to the score,
   independent of Ouroboros's own (both can be banked at once; a death
   spends Ouroboros's first - see `handleDeath()`) - +400, 🗿 badge,
   deliberately doesn't change the snake's body color (see below) - the
@@ -145,8 +158,8 @@ states. Everything else follows from which one it's in:
 | --- | --- | --- | --- |
 | Plain | run start | nothing - length does nothing, no wall | ` ♡ ♡ ` |
 | Ouroboros fired | bit your own tail tip | Basilisk spawns on your next swipe | ` ♥ ♡ ` |
-| Basilisk active | swiped to resume | outgaze it (15 apples) or die to it | ` ♥ ♡ ` |
-| Basilisk outgazed | ate 15 apples with the wall up | Jörmungandr, on a later food-eat | ` ♥ ♥ ` |
+| Basilisk active | swiped to resume | outgaze it (3 stages, 20 apples total) or die to it | ` ♥ ♡ ` |
+| Basilisk outgazed | cleared all 3 stages | Jörmungandr, on a later food-eat | ` ♥ ♥ ` |
 | Jörmungandr found | grew back past the length threshold | nothing left - run it out | ` ♥ ♥ ` |
 
 Rules that hold across every state:
@@ -175,7 +188,7 @@ Rules that hold across every state:
   eatable until `regrowPending` hits 0, at which point a fresh apple is
   placed clear of the body. One check in `update()` and one in
   `drawGame()`, both keyed on that counter, so all three paths get it.
-  The point is the Basilisk: its 15 apples would otherwise be eaten
+  The point is the Basilisk: its 20 apples would otherwise be eaten
   while conveniently short, so this forces the fight at full length -
   you pay in difficulty for the free life it banks.
 - **Bonuses never affect difficulty.** Speed is driven by `pacingScore`,
@@ -224,7 +237,7 @@ silent no-op until it's dismissed.
 | --- | --- |
 | `deaths.spec.js` | The four death causes and their message/image tables |
 | `ouroboros.spec.js` | The scaled bonus curve, the collapse, the free life, once-per-run |
-| `basilisk.spec.js` | Spawn geometry (sampled over repeated runs), the gaze death, the apple counter, outgazing |
+| `basilisk.spec.js` | Spawn geometry (sampled over repeated runs), the gaze death, the apple counter, the 3-stage split and its randomisation, outgazing |
 | `chain.spec.js` | Egg gating, both free lives, full-run score arithmetic, restart, leaderboard badges |
 | `regrow.spec.js` | The no-apple-while-regrowing rule, on all three collapse paths |
 | `gates.spec.js` | The shared announcement overlay/gate - all four triggers, the badge emoji, golden rays on a life saved - driven through real touch and key events |

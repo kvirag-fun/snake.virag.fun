@@ -971,12 +971,28 @@
         const OUROBOROS_MAX_BONUS = 400;
 
         // Basilisk easter egg - see spawnBasilisk()/triggerBasiliskSurvived()
-        // below for the full mechanism.
-        const BASILISK_FOOD_COUNT = 15;
+        // below for the full mechanism. The encounter is 3 sequential
+        // stages (a new wall - new origin, same current heading - each
+        // time one clears) totalling BASILISK_TOTAL_FOOD apples, however
+        // they end up split: randomised per run at the first spawn, each
+        // stage getting at least BASILISK_STAGE_MIN, see
+        // randomBasiliskStageQuotas(). The total is fixed regardless of
+        // the split, so outgazing it always takes exactly 20 apples -
+        // only where the wall resets along the way is unpredictable.
+        const BASILISK_TOTAL_FOOD = 20;
+        const BASILISK_STAGE_COUNT = 3;
+        const BASILISK_STAGE_MIN = 5;
         let basiliskTriggered = false;
         let basiliskActive = false;
         let basiliskWall = [];
         let basiliskFoodCounter = 0;
+        // Which of the BASILISK_STAGE_COUNT stages is current (1-indexed;
+        // 0 when no Basilisk encounter is underway) and how many apples
+        // each stage needs - see randomBasiliskStageQuotas(). Both are
+        // set once, at the very first spawn, and untouched by anything
+        // short of outgazing it or restarting.
+        let basiliskStage = 0;
+        let basiliskStageQuotas = [];
 
         // Ouroboros no longer shrinks the snake permanently - it collapses
         // to a single tile at the point of the bite, banks a free life
@@ -1543,6 +1559,8 @@
                 specialEventWaiting = false;
                 specialEventKind = null;
                 if (resumedKind === 'ouroboros' && !basiliskTriggered && !basiliskActive) {
+                    basiliskStage = 1;
+                    basiliskStageQuotas = randomBasiliskStageQuotas();
                     spawnBasilisk(nextDx, nextDy);
                 }
             }
@@ -1632,8 +1650,8 @@
                 // back to the old length. No apple exists during this
                 // stretch, so you have to re-earn your length by pure
                 // navigation before anything can be eaten: the Basilisk's
-                // 15 apples are then fought at full size, not while
-                // conveniently short.
+                // 20 apples, across its 3 stages, are then fought at full
+                // size, not while conveniently short.
                 regrowPending--;
                 if (regrowPending === 0) {
                     // Back to full length - place the first apple now,
@@ -1644,13 +1662,21 @@
                 snake.pop();
             }
 
-            // Basilisk: surviving until BASILISK_FOOD_COUNT apples have
-            // been eaten since it spawned is the achievement - the wall
-            // itself doesn't reward anything, only outlasting it does.
-            // Checked before Jörmungandr below, since Jörmungandr now
-            // requires this to have already happened.
-            if (!specialEventWaiting && basiliskActive && basiliskFoodCounter >= BASILISK_FOOD_COUNT) {
-                triggerBasiliskSurvived();
+            // Basilisk: surviving until the current stage's quota of
+            // apples have been eaten since its wall last (re)spawned is
+            // the achievement - the wall itself doesn't reward anything,
+            // only outlasting it does. Before the last stage, "surviving"
+            // just moves the wall (new origin, current heading) rather
+            // than ending the encounter. Checked before Jörmungandr
+            // below, since Jörmungandr now requires the whole encounter
+            // to have already finished.
+            if (!specialEventWaiting && basiliskActive && basiliskFoodCounter >= basiliskStageQuotas[basiliskStage - 1]) {
+                if (basiliskStage < BASILISK_STAGE_COUNT) {
+                    basiliskStage++;
+                    spawnBasilisk(dx, dy);
+                } else {
+                    triggerBasiliskSurvived();
+                }
             }
 
             // Jörmungandr: growing long enough is its own easter egg, but
@@ -1796,24 +1822,54 @@
             {x: -1, y: -1}, {x: 1, y: -1}, {x: -1, y: 1}, {x: 1, y: 1}, // corners
         ];
 
+        // Splits BASILISK_TOTAL_FOOD apples across BASILISK_STAGE_COUNT
+        // stages, each getting at least BASILISK_STAGE_MIN, the rest
+        // ("slack") handed out randomly. Standard stars-and-bars: pick
+        // STAGE_COUNT-1 random cut points along the slack, sort them, and
+        // the gaps between consecutive cuts (0 and slack included as the
+        // outer bounds) are each stage's share of the slack on top of its
+        // floor. E.g. slack 5, cuts [2, 4] -> gaps 2, 2, 1 -> quotas
+        // 7, 7, 6 (sums to 20 regardless of how the cuts land).
+        function randomBasiliskStageQuotas() {
+            const slack = BASILISK_TOTAL_FOOD - BASILISK_STAGE_MIN * BASILISK_STAGE_COUNT;
+            const cuts = [0];
+            for (let i = 0; i < BASILISK_STAGE_COUNT - 1; i++) {
+                cuts.push(Math.floor(Math.random() * (slack + 1)));
+            }
+            cuts.push(slack);
+            cuts.sort((a, b) => a - b);
+
+            const quotas = [];
+            for (let i = 0; i < BASILISK_STAGE_COUNT; i++) {
+                quotas.push(BASILISK_STAGE_MIN + (cuts[i + 1] - cuts[i]));
+            }
+            return quotas;
+        }
+
         // Basilisk easter egg: can only appear after Ouroboros has already
         // fired (see the specialEventWaiting-resume branch in update(),
-        // which calls this) - spawns the moment play resumes after
-        // Ouroboros's own pause, gazing a wall of blocked tiles out to the
-        // board edge. Touching any tile of it, including the origin, is a
-        // death like any wall (see the basiliskActive check in update()).
+        // which sets up the stage count/quotas and calls this for the
+        // first time) - spawns the moment play resumes after Ouroboros's
+        // own pause, gazing a wall of blocked tiles out to the board
+        // edge. Touching any tile of it, including the origin, is a death
+        // like any wall (see the basiliskActive check in update()). Also
+        // the function a cleared stage calls again for the next one (see
+        // the stage-advance check in update()) - same geometry rules
+        // either way, just with the snake's current position/heading
+        // wherever the previous stage left it, not necessarily center.
         //
-        // The gaze always points the same way the player just swiped to
-        // resume (headingX/headingY) - never some unrelated random
+        // The gaze always points the same way the player is currently
+        // heading (headingX/headingY) - never some unrelated random
         // direction - so it's never a surprise: it only ever extends
-        // further along the path you were already about to take, rather
-        // than potentially appearing behind you or across it. The origin
-        // is picked at random from the 3 of the 8 surrounding tiles that
-        // sit on that same side of center (e.g. heading right picks
-        // randomly among the right column's 3 tiles - side, upper-corner,
-        // lower-corner - and gazes right from whichever one it lands on).
-        // This also guarantees it never originates at the center itself,
-        // where a forgiven death always respawns (see respawnWithSameLength()).
+        // further along the path already being taken, rather than
+        // potentially appearing behind the snake or across it. The origin
+        // is picked at random from the 3 of the 8 tiles surrounding
+        // board center that sit on that same side (e.g. heading right
+        // picks randomly among the right column's 3 tiles - side,
+        // upper-corner, lower-corner - and gazes right from whichever one
+        // it lands on). This also guarantees it never originates at the
+        // center itself, where a forgiven death always respawns (see
+        // respawnWithSameLength()).
         function spawnBasilisk(headingX, headingY) {
             const centerX = Math.floor(tileCount / 2);
             const centerY = Math.floor(tileCount / 2);
@@ -1826,23 +1882,41 @@
             // row/column the instant it appears, ambushing the player.
             // Each candidate has a distinct row (or column), so at most
             // one is ever excluded, always leaving at least 2 choices.
-            const candidates = BASILISK_SPAWN_OFFSETS.filter((o) =>
+            const rowColSafe = BASILISK_SPAWN_OFFSETS.filter((o) =>
                 headingX !== 0
                     ? o.x === headingX && centerY + o.y !== headPos.y
                     : o.y === headingY && centerX + o.x !== headPos.x
             );
-            const offset = candidates[Math.floor(Math.random() * candidates.length)];
-            const originX = centerX + offset.x;
-            const originY = centerY + offset.y;
 
-            const wall = [{x: originX, y: originY}];
-            let x = originX, y = originY;
-            while (x + headingX >= 0 && x + headingX < tileCount && y + headingY >= 0 && y + headingY < tileCount) {
-                x += headingX;
-                y += headingY;
-                wall.push({x, y});
-            }
-            basiliskWall = wall;
+            // For a later stage, the snake is no longer necessarily short
+            // and freshly collapsed at center the way it is on the very
+            // first spawn - by now it may have grown enough to actually
+            // pass near center, where every candidate originates. Build
+            // each remaining candidate's full wall line and drop any that
+            // would land directly on the current body, so a stage never
+            // transitions into an instant, unavoidable death by spawning
+            // a wall through the snake itself. Falls back to the
+            // row/column-safe set if every candidate collides (a long
+            // enough body coiled through center could in principle rule
+            // all of them out) - avoiding the snake takes priority when
+            // possible, but this spawn always has to place a wall somewhere.
+            const wallFor = (o) => {
+                const wall = [{x: centerX + o.x, y: centerY + o.y}];
+                let x = wall[0].x, y = wall[0].y;
+                while (x + headingX >= 0 && x + headingX < tileCount && y + headingY >= 0 && y + headingY < tileCount) {
+                    x += headingX;
+                    y += headingY;
+                    wall.push({x, y});
+                }
+                return wall;
+            };
+            const bodySafe = rowColSafe.filter((o) =>
+                !wallFor(o).some((seg) => snake.some((s) => s.x === seg.x && s.y === seg.y))
+            );
+            const candidates = bodySafe.length > 0 ? bodySafe : rowColSafe;
+
+            const offset = candidates[Math.floor(Math.random() * candidates.length)];
+            basiliskWall = wallFor(offset);
             basiliskActive = true;
             basiliskFoodCounter = 0;
 
@@ -1853,13 +1927,15 @@
         }
 
         // The wall persisting isn't itself the achievement - surviving
-        // until BASILISK_FOOD_COUNT apples have been eaten since it
-        // spawned (not raw moves - circling in place forever would
-        // otherwise clear it for free) is. Checked in update() above.
+        // every stage's quota of apples (not raw moves - circling in
+        // place forever would otherwise clear it for free) is. Checked
+        // in update() above.
         function triggerBasiliskSurvived() {
             basiliskActive = false;
             basiliskWall = [];
             basiliskTriggered = true;
+            basiliskStage = 0;
+            basiliskStageQuotas = [];
             // Deliberately doesn't touch snakeColorMode - see SNAKE_COLORS
             // above for why.
 
@@ -1998,6 +2074,8 @@
             basiliskActive = false;
             basiliskWall = [];
             basiliskFoodCounter = 0;
+            basiliskStage = 0;
+            basiliskStageQuotas = [];
             updateExtraLifeIndicator();
             snakeColorMode = 'normal';
             specialEventKind = null;

@@ -195,6 +195,8 @@ function installHelpers() {
                 basiliskWallLength: basiliskWall.length,
                 basiliskWall: basiliskWall.map((s) => ({ x: s.x, y: s.y })),
                 basiliskFoodCounter,
+                basiliskStage,
+                basiliskStageQuotas: [...basiliskStageQuotas],
                 ouroborosLifeAvailable,
                 basiliskLifeAvailable,
                 specialEventWaiting,

@@ -236,7 +236,7 @@ test('the gate also covers the Basilisk life, not just Ouroboros', async ({ game
         const h = window.__game;
         h.fireOuroboros();
         h.dismissAndResume(1, 0);
-        h.eatApples(15);                    // banks the second life
+        h.eatApples(20);                    // banks the second life
         h.dismissAndResume(1, 0);
         h.killIntoWall();                   // spends Ouroboros's
         h.killIntoWall();                   // spends the Basilisk's
@@ -290,7 +290,7 @@ test('outgazing shows its own badge, Jörmungandr shows its own', async ({ game 
         const h = window.__game;
         h.fireOuroboros();
         h.dismissAndResume(1, 0);
-        h.eatApples(15);
+        h.eatApples(20);
         const basiliskBonus = specialOverlayBonusElement.textContent;
 
         h.dismissAndResume(1, 0);

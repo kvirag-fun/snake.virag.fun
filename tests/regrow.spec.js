@@ -7,7 +7,7 @@
 // because "they share a counter" is exactly the kind of thing a later
 // refactor quietly breaks.
 //
-// The rule exists for the Basilisk: its 15 apples used to be eaten while
+// The rule exists for the Basilisk: its apples used to be eaten while
 // the snake was conveniently short, making the fight easiest precisely
 // when it was meant to cost something.
 import { test, expect } from './helpers.js';
@@ -48,7 +48,7 @@ test('no apple can be eaten after outgazing the Basilisk', async ({ game }) => {
         const h = window.__game;
         h.fireOuroboros();
         h.dismissAndResume(1, 0);
-        h.eatApples(15);
+        h.eatApples(20);
         const collapsed = h.state();
         h.dismissAndResume(1, 0);
         const ate = h.tryToEatWhileRegrowing(5);
