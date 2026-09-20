@@ -470,10 +470,14 @@
             margin-top: 4px;
         }
 
+        /* Same size/weight as .special-title, per the same request that
+           un-shrunk it after an earlier pass had it a small, dim hint
+           line - deliberately no visual demotion from the title above
+           it. */
         .special-overlay .special-continue-hint {
-            font-size: 11px;
+            font-size: 16px;
+            font-weight: 600;
             margin-top: 10px;
-            opacity: 0.85;
         }
 
         /* Same reasoning as body.playing above - only disable native touch
@@ -617,21 +621,17 @@
             <canvas id="gameCanvas" width="400" height="400"></canvas>
             <div id="gameOverTop" class="game-over-overlay game-over-top" hidden></div>
             <div id="gameOverBottom" class="game-over-overlay game-over-bottom">Double-tap or press R to restart.</div>
+            <!-- One overlay for all four announcements - Ouroboros
+                 unlocked, a life saved by it (see respawnWithSameLength()),
+                 Basilisk outgazed, Jörmungandr found - via
+                 beginSpecialEvent(kind, title, bonus). Only the title/
+                 bonus text and the rays' color (SUNBURST_RGB[kind]) vary
+                 per call; the bonus line hides itself when passed '' (see
+                 beginSpecialEvent()), which is what makes a life-saved
+                 announcement look identical to the others minus a number. -->
             <div id="specialOverlay" class="special-overlay" hidden>
                 <div class="special-title" id="specialOverlayTitle"></div>
                 <div class="special-bonus" id="specialOverlayBonus"></div>
-                <div class="special-continue-hint">Double-tap or press R to continue.</div>
-            </div>
-            <!-- The special-overlay class is what makes .special-title/
-                 .special-continue-hint actually apply their sizing - those
-                 selectors are scoped to a .special-overlay ancestor. Only
-                 real difference from an announcement: no rays, since this
-                 never calls drawSpecialRays(). It holds movement until a
-                 deliberate double-tap or R (respawnDismissed) - the swipe
-                 in flight when the snake died must not carry into its new
-                 life. -->
-            <div id="respawnMessage" class="respawn-message special-overlay" hidden>
-                <div class="special-title">Saved by Ouroboros!</div>
                 <div class="special-continue-hint">Double-tap or press R to continue.</div>
             </div>
         </div>
@@ -786,7 +786,6 @@
         const specialOverlayBonusElement = document.getElementById('specialOverlayBonus');
         const extraLifeIndicatorElement = document.getElementById('extraLifeIndicator');
         const basiliskLifeIndicatorElement = document.getElementById('basiliskLifeIndicator');
-        const respawnMessageElement = document.getElementById('respawnMessage');
         const soundToggle = document.getElementById('soundToggle');
         const difficultySelect = document.getElementById('difficultySelect');
 
@@ -997,18 +996,6 @@
         // move, see update()) after an Ouroboros collapse or a forgiven
         // death's respawn.
         let regrowPending = 0;
-        // True while the post-respawn "pick a direction" message is up -
-        // cleared the moment a real direction arrives. Gated exactly like
-        // a special-event overlay: movement waits for a deliberate
-        // double-tap or R before any swipe or arrow key counts as a
-        // direction. The death that spent the life is usually
-        // a panicked moment mid-swipe, so without the gate a stray touch
-        // sets the snake moving again before the player has even found
-        // where it respawned - which throws away the life they just
-        // earned.
-        let respawnMessageShowing = false;
-        let respawnDismissed = false;
-        let respawnLastTap = 0;
 
         // Which snake color to draw - sticks after whichever of Ouroboros/
         // Jörmungandr fired most recently. Outgazing the Basilisk never
@@ -1526,14 +1513,6 @@
                 return;
             }
 
-            // The respawn after a forgiven death waits the same way, and
-            // for the same reason: whatever swipe was in flight when the
-            // snake died must not carry over into its new life.
-            if (respawnMessageShowing && !respawnDismissed) {
-                inputQueue = [];
-                return;
-            }
-
             // Get next direction from queue OR use current dx/dy
             let nextDx = dx;
             let nextDy = dy;
@@ -1551,7 +1530,14 @@
             // this is also the moment the Basilisk spawns (see
             // spawnBasilisk() below) - it's the gate everything else waits
             // behind, so it only ever needs to check for itself here, not
-            // Jörmungandr's or its own overlay resuming.
+            // Jörmungandr's or its own overlay resuming. respawnWithSameLength()
+            // reuses kind 'ouroboros' too (see there), but the guard below
+            // still can't double-spawn it from a forgiven death: update()
+            // never lets a death happen while specialEventWaiting is true
+            // (see the early return above), so by the time any death can
+            // occur, Ouroboros's own overlay has already resumed and
+            // spawnBasilisk() has already run once - basiliskActive or
+            // basiliskTriggered is already true here.
             if (specialEventWaiting) {
                 const resumedKind = specialEventKind;
                 specialEventWaiting = false;
@@ -1559,11 +1545,6 @@
                 if (resumedKind === 'ouroboros' && !basiliskTriggered && !basiliskActive) {
                     spawnBasilisk(nextDx, nextDy);
                 }
-            }
-
-            if (respawnMessageShowing) {
-                respawnMessageShowing = false;
-                respawnMessageElement.hidden = true;
             }
 
             const head = {x: snake[0].x + nextDx, y: snake[0].y + nextDy};
@@ -1752,14 +1733,19 @@
         // swipes again, instead of snapping back to its old length
         // instantly. Always safe from the Basilisk's wall, if one is up -
         // it never originates exactly at center (see spawnBasilisk()).
+        //
+        // Announced through the same beginSpecialEvent() overlay as an
+        // egg discovery - golden rays and all, since the message always
+        // credits Ouroboros regardless of which of the two lives was
+        // actually spent (see the CSS comment on .special-overlay). No
+        // bonus line (''), and no risk of it re-spawning the Basilisk on
+        // resume: see the comment on the specialEventWaiting resume
+        // branch in update() for why.
         function respawnWithSameLength() {
             const startX = Math.floor(tileCount / 2);
             const startY = Math.floor(tileCount / 2);
             regrowPending = snake.length - 1;
             snake = [{x: startX, y: startY}];
-            dx = 0;
-            dy = 0;
-            inputQueue = [];
 
             // The new body occupies a very different part of the board -
             // re-roll food/bad food so they can't already be sitting
@@ -1768,9 +1754,7 @@
             randomFood();
             randomBadFood();
 
-            respawnMessageShowing = true;
-            respawnDismissed = false;
-            respawnMessageElement.hidden = false;
+            beginSpecialEvent('ouroboros', 'Saved by Ouroboros!', '');
         }
 
         function updateExtraLifeIndicator() {
@@ -1902,6 +1886,24 @@
             beginSpecialEvent('basilisk', 'Basilisk Outgazed!', '+400');
         }
 
+        // Same three emoji as the leaderboard's own badges (see
+        // renderScores() and its `badge` line) - reused here rather than
+        // redeclared with different characters, so the announcement you
+        // see mid-run and the badge that later shows next to your score
+        // are visibly the same symbol.
+        const ANNOUNCEMENT_EMOJI = {
+            ouroboros: '♾️',
+            basilisk: '\u{1F5FF}',
+            jormungandr: '\u{1F409}',
+        };
+
+        // The one overlay behind all four announcements (see the
+        // callers: triggerOuroboros(), respawnWithSameLength(),
+        // triggerBasiliskSurvived(), the Jörmungandr food-eat branch in
+        // update()). `bonus` is '' for the life-saved case, which has no
+        // points to show - the bonus line is hidden entirely rather than
+        // left as an empty gap, and with nothing to hang it on, no emoji
+        // is appended either.
         function beginSpecialEvent(kind, title, bonus) {
             dx = 0;
             dy = 0;
@@ -1910,21 +1912,13 @@
             specialEventWaiting = true;
             specialEventOverlayDismissed = false;
             specialOverlayTitleElement.textContent = title;
-            specialOverlayBonusElement.textContent = bonus;
+            specialOverlayBonusElement.textContent = bonus ? `${bonus} ${ANNOUNCEMENT_EMOJI[kind]}` : '';
+            specialOverlayBonusElement.hidden = !bonus;
             specialOverlayElement.hidden = false;
         }
 
         function hideSpecialOverlay() {
             specialOverlayElement.hidden = true;
-        }
-
-        // Mirrors hideSpecialOverlay(): the text disappears the instant
-        // the gate is dismissed (double-tap or R), not only once a
-        // direction actually arrives - respawnMessageShowing itself stays
-        // true until then, since it's still what update() checks to hold
-        // movement (see respawnDismissed).
-        function hideRespawnMessage() {
-            respawnMessageElement.hidden = true;
         }
 
         // Adjust game speed
@@ -2009,9 +2003,6 @@
             specialEventWaiting = false;
             specialEventOverlayDismissed = false;
             hideSpecialOverlay();
-            respawnMessageShowing = false;
-            respawnDismissed = false;
-            respawnMessageElement.hidden = true;
 
             if (splashLoaded) {
                 splashLoaded = false
@@ -2045,31 +2036,22 @@
                 return; // Don't process direction change after restart
             }
 
-            // R dismisses a special-event overlay, the keyboard's
-            // equivalent of the double-tap. It only dismisses - the swipe
-            // or arrow key afterwards is what sets the first move.
+            // R dismisses a special-event overlay (any of the four -
+            // an egg discovery or a life saved by one, see
+            // beginSpecialEvent()), the keyboard's equivalent of the
+            // double-tap. It only dismisses - the swipe or arrow key
+            // afterwards is what sets the first move. A direction never
+            // doubles as the dismissal, whatever the input device, so the
+            // sequence is the same everywhere: confirm you are ready, then
+            // steer. Anything queued meanwhile is dropped by update()
+            // rather than becoming the first move.
             if (e.keyCode === R && specialEventWaiting && !specialEventOverlayDismissed && e.target.tagName !== 'INPUT') {
                 specialEventOverlayDismissed = true;
                 hideSpecialOverlay();
                 return;
             }
 
-            // Same for the post-respawn message's own gate, and for the
-            // same reason.
-            if (e.keyCode === R && respawnMessageShowing && !respawnDismissed && e.target.tagName !== 'INPUT') {
-                respawnDismissed = true;
-                hideRespawnMessage();
-                return;
-            }
-
             if (!gameRunning) return;
-
-            // Both gates - a special-event overlay and the post-respawn
-            // message - dismiss one way only: a double-tap, or R. A
-            // direction never doubles as the dismissal, whatever the input
-            // device, so the sequence is the same everywhere: confirm you
-            // are ready, then steer. Anything queued meanwhile is dropped
-            // by update() rather than becoming the first move.
 
             // Decide what the "current" direction is for validation
             const lastDir = inputQueue.length > 0 ? inputQueue.at(-1) : { dx, dy };
@@ -2172,9 +2154,11 @@
             if (touchIsOnControl) return;
             e.preventDefault();
 
-            // Double-tap to dismiss a special-event overlay - the swipe
-            // that follows is what actually sets the first direction
-            // (handled in update()/touchmove), not this tap itself.
+            // Double-tap to dismiss a special-event overlay (any of the
+            // four - an egg discovery or a life saved by one, see
+            // beginSpecialEvent()) - the swipe that follows is what
+            // actually sets the first direction (handled in
+            // update()/touchmove), not this tap itself.
             if (specialEventWaiting && !specialEventOverlayDismissed) {
                 const now = new Date().getTime();
                 const tapLength = now - specialEventLastTap;
@@ -2184,20 +2168,6 @@
                     hideSpecialOverlay();
                 }
                 specialEventLastTap = now;
-                return;
-            }
-
-            // Double-tap to start moving again after a forgiven death -
-            // the swipe that follows sets the direction, not this tap.
-            if (gameRunning && respawnMessageShowing && !respawnDismissed) {
-                const now = new Date().getTime();
-                const tapLength = now - respawnLastTap;
-
-                if (tapLength < doubleTapDelay && tapLength > 0) {
-                    respawnDismissed = true;
-                    hideRespawnMessage();
-                }
-                respawnLastTap = now;
                 return;
             }
 

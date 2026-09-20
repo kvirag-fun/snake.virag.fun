@@ -1,12 +1,16 @@
-// The two "confirm before you steer" gates: an egg's announcement
-// overlay, and the message after a free life saves you. Both hold
-// movement until a double-tap or R - never a direction, on any device.
+// One announcement overlay, one gate, four triggers: Ouroboros unlocked,
+// a life it saves, Basilisk outgazed, Jörmungandr found - all through
+// beginSpecialEvent(kind, title, bonus) in index.html. Only the text,
+// the rays' color (SUNBURST_RGB[kind]), and the bonus line vary; the
+// gate itself - hold movement until a deliberate double-tap or R, never
+// a direction, on any device - is exactly one piece of code, so a life
+// saved by Ouroboros behaves identically to any other announcement.
 //
-// The reason is the same for both. Whatever swipe or keypress was in
-// flight when the pause began must not become the first move of what
-// comes after it: for a respawn that means the snake sets off before the
-// player has even found where it landed, throwing away the life they
-// just earned.
+// The reason for the gate is sharpest on a life saved: whatever swipe or
+// keypress was in flight when the snake died must not become the first
+// move of its new life - it would set off again before the player has
+// even found where it respawned, throwing away the life they just
+// earned.
 //
 // These specs drive real touch and keyboard events rather than poking at
 // the handlers' state, because a gate is only worth anything if the
@@ -14,7 +18,9 @@
 import { test, expect } from './helpers.js';
 
 // Put the game in the "saved by a free life" state: Ouroboros banked,
-// then a death that spends it.
+// then a death that spends it. Reuses the kind 'ouroboros' announcement
+// (see respawnWithSameLength()), so this looks and behaves exactly like
+// the discovery overlay below, minus the bonus line.
 async function spendALife(game) {
     return game.evaluate(() => {
         const h = window.__game;
@@ -41,7 +47,7 @@ async function tapCanvas(game, times) {
 }
 
 // Queue a direction and tick: does the snake actually move? This is the
-// behaviour the gate exists for - asserting only on `respawnDismissed`
+// behaviour the gate exists for - asserting only on `specialEventWaiting`
 // would still pass if the flag were set but never consulted.
 function tryToMove(game) {
     return game.evaluate(() => {
@@ -53,14 +59,60 @@ function tryToMove(game) {
     });
 }
 
-test('a forgiven death arms the gate and shows the message', async ({ game }) => {
+// Sample a ring of points around the canvas center, well outside the
+// single-tile snake sitting there (it collapses to the center on a
+// respawn - see respawnWithSameLength()), and report how many are gold.
+// Checks for "clearly more red+green than blue, bright enough to not be
+// the navy background" rather than an exact RGB match, since the rays'
+// alpha gradient blends them with whatever is underneath.
+//
+// Sampling many angles rather than one matters because the rays rotate
+// with the clock (see drawSpecialRays()) - at any given instant only
+// some of the 12 wedges land on a given angle, but with samples every 5
+// degrees at least a few always fall inside a ray regardless of the
+// current rotation.
+function goldRingPixelCount(game, radius) {
+    return game.evaluate((r) => {
+        let hits = 0;
+        for (let deg = 0; deg < 360; deg += 5) {
+            const rad = (deg * Math.PI) / 180;
+            const x = Math.round(canvas.width / 2 + r * Math.cos(rad));
+            const y = Math.round(canvas.height / 2 + r * Math.sin(rad));
+            const [red, green, blue] = ctx.getImageData(x, y, 1, 1).data;
+            if (red > 80 && green > 60 && blue < 60 && red > blue * 1.5) hits++;
+        }
+        return hits;
+    }, radius);
+}
+
+test('a forgiven death shows the "Saved by Ouroboros!" announcement', async ({ game }) => {
     const state = await spendALife(game);
     expect(state.gameRunning).toBe(true);
-    expect(state.respawnMessageShowing).toBe(true);
-    expect(state.respawnDismissed).toBe(false);
-    await expect(game.locator('#respawnMessage')).toBeVisible();
-    await expect(game.locator('#respawnMessage')).toContainText('Double-tap');
+    expect(state.specialEventWaiting).toBe(true);
+    expect(state.specialEventKind).toBe('ouroboros');
+    await expect(game.locator('#specialOverlay')).toBeVisible();
+    await expect(game.locator('#specialOverlayTitle')).toHaveText('Saved by Ouroboros!');
+    // No points for being saved - the bonus line is hidden, not just empty.
+    await expect(game.locator('#specialOverlayBonus')).toBeHidden();
     expect(await tryToMove(game)).toBe(false);
+});
+
+test('golden rays play behind a life-saving announcement, same as a discovery', async ({ game }) => {
+    await spendALife(game);
+    await game.evaluate(() => drawGame());
+    const withOverlay = await goldRingPixelCount(game, 120);
+    expect(withOverlay).toBeGreaterThan(0);
+
+    // Same exact frame, overlay dismissed (no move yet, so the snake's
+    // still the same single gold tile at center) - the only thing that
+    // can account for a difference is the rays turning off.
+    await game.evaluate(() => {
+        specialEventOverlayDismissed = true;
+        hideSpecialOverlay();
+        drawGame();
+    });
+    const withoutOverlay = await goldRingPixelCount(game, 120);
+    expect(withoutOverlay).toBe(0);
 });
 
 test('a direction alone does not start the snake moving', async ({ game }) => {
@@ -83,7 +135,7 @@ test('one tap is not enough', async ({ game }) => {
     await spendALife(game);
     await tapCanvas(game, 1);
     const state = await game.evaluate(() => window.__game.state());
-    expect(state.respawnDismissed).toBe(false);
+    expect(state.specialEventOverlayDismissed).toBe(false);
     expect(await tryToMove(game)).toBe(false);
 });
 
@@ -92,12 +144,11 @@ test('a double-tap opens the gate, and the swipe after it moves', async ({ game 
     await tapCanvas(game, 2);
 
     const dismissed = await game.evaluate(() => window.__game.state());
-    expect(dismissed.respawnDismissed).toBe(true);
+    expect(dismissed.specialEventOverlayDismissed).toBe(true);
     // Dismissing is not itself a move - the snake still waits for a
-    // direction - but the text disappears right away, the same as the
-    // announcement overlay does on its own double-tap.
-    expect(dismissed.respawnMessageShowing).toBe(true);
-    await expect(game.locator('#respawnMessage')).toBeHidden();
+    // direction - but the text disappears right away.
+    expect(dismissed.specialEventWaiting).toBe(true);
+    await expect(game.locator('#specialOverlay')).toBeHidden();
 
     const result = await game.evaluate(() => {
         const h = window.__game;
@@ -107,9 +158,9 @@ test('a double-tap opens the gate, and the swipe after it moves', async ({ game 
         return { before, after: { ...snake[0] }, ...h.state() };
     });
     expect(result.after).toEqual({ x: result.before.x, y: result.before.y + 1 });
-    // The message clears itself on that first real move.
-    expect(result.respawnMessageShowing).toBe(false);
-    await expect(game.locator('#respawnMessage')).toBeHidden();
+    // The overlay clears itself on that first real move.
+    expect(result.specialEventWaiting).toBe(false);
+    await expect(game.locator('#specialOverlay')).toBeHidden();
 });
 
 test('two taps far apart are two single taps, not a double-tap', async ({ game }) => {
@@ -118,7 +169,7 @@ test('two taps far apart are two single taps, not a double-tap', async ({ game }
     await game.waitForTimeout(400);          // longer than doubleTapDelay
     await tapCanvas(game, 1);
     const state = await game.evaluate(() => window.__game.state());
-    expect(state.respawnDismissed).toBe(false);
+    expect(state.specialEventOverlayDismissed).toBe(false);
     expect(await tryToMove(game)).toBe(false);
 });
 
@@ -136,7 +187,7 @@ test('an arrow key alone does not open the gate', async ({ game }) => {
 
     // Steering never doubles as the dismissal, on any device - it's
     // double-tap or R, always.
-    expect(result.respawnDismissed).toBe(false);
+    expect(result.specialEventOverlayDismissed).toBe(false);
     expect(result.after).toEqual(before);
 });
 
@@ -152,19 +203,19 @@ test('R then an arrow key is the keyboard sequence that moves', async ({ game })
         return { after: { ...snake[0] }, ...h.state() };
     });
 
-    expect(result.respawnDismissed).toBe(true);
+    expect(result.specialEventOverlayDismissed).toBe(true);
     expect(result.after).toEqual({ x: before.x, y: before.y + 1 });
 });
 
 test('R dismisses without picking a direction', async ({ game }) => {
     await spendALife(game);
     const before = await game.evaluate(() => ({ ...snake[0] }));
-    await expect(game.locator('#respawnMessage')).toBeVisible();
+    await expect(game.locator('#specialOverlay')).toBeVisible();
 
     await game.keyboard.press('r');
     // Same as a double-tap: the text disappears the moment R dismisses,
     // not only once a direction actually arrives.
-    await expect(game.locator('#respawnMessage')).toBeHidden();
+    await expect(game.locator('#specialOverlay')).toBeHidden();
 
     const result = await game.evaluate(() => {
         const h = window.__game;
@@ -173,7 +224,7 @@ test('R dismisses without picking a direction', async ({ game }) => {
         return { after: { ...snake[0] }, ...h.state() };
     });
 
-    expect(result.respawnDismissed).toBe(true);
+    expect(result.specialEventOverlayDismissed).toBe(true);
     expect(result.after).toEqual(before);       // still waiting for a swipe
     expect(result.gameRunning).toBe(true);      // and R did not restart the run
 });
@@ -192,8 +243,9 @@ test('the gate also covers the Basilisk life, not just Ouroboros', async ({ game
 
     expect(state.gameRunning).toBe(true);
     expect(state.basiliskLifeAvailable).toBe(false);
-    expect(state.respawnMessageShowing).toBe(true);
-    expect(state.respawnDismissed).toBe(false);
+    expect(state.specialEventWaiting).toBe(true);
+    expect(state.specialEventKind).toBe('ouroboros');   // credited to Ouroboros either way
+    expect(state.specialEventOverlayDismissed).toBe(false);
     expect(await tryToMove(game)).toBe(false);
 });
 
@@ -204,13 +256,13 @@ test('restarting clears the gate', async ({ game }) => {
         h.reset();
         return h.state();
     });
-    expect(state.respawnMessageShowing).toBe(false);
-    expect(state.respawnDismissed).toBe(false);
-    await expect(game.locator('#respawnMessage')).toBeHidden();
+    expect(state.specialEventWaiting).toBe(false);
+    expect(state.specialEventOverlayDismissed).toBe(false);
+    await expect(game.locator('#specialOverlay')).toBeHidden();
 });
 
 
-// ---- the announcement overlay's gate ---------------------------------
+// ---- the same gate, exercised via a fresh egg discovery instead ------
 
 test('an announcement holds movement until it is dismissed', async ({ game }) => {
     const state = await game.evaluate(() => {
@@ -220,7 +272,36 @@ test('an announcement holds movement until it is dismissed', async ({ game }) =>
     });
     expect(state.specialEventWaiting).toBe(true);
     await expect(game.locator('#specialOverlay')).toBeVisible();
+    await expect(game.locator('#specialOverlayBonus')).toBeVisible();
     expect(await tryToMove(game)).toBe(false);
+});
+
+test('the bonus line carries the same badge emoji as the leaderboard', async ({ game }) => {
+    await game.evaluate(() => window.__game.fireOuroboros());
+    // Same character used in renderScores()'s own badge string - not
+    // just "some emoji", the identical one the leaderboard shows later.
+    await expect(game.locator('#specialOverlayBonus')).toHaveText('+80 ♾️');
+});
+
+test('outgazing shows its own badge, Jörmungandr shows its own', async ({ game }) => {
+    const bonuses = await game.evaluate(() => {
+        const h = window.__game;
+        h.fireOuroboros();
+        h.dismissAndResume(1, 0);
+        h.eatApples(15);
+        const basiliskBonus = specialOverlayBonusElement.textContent;
+
+        h.dismissAndResume(1, 0);
+        h.stack(JORMUNGANDR_LENGTH + 10, 3, 12);
+        food = { x: 4, y: 12 };
+        dx = 1;
+        dy = 0;
+        h.step();
+        const jormungandrBonus = specialOverlayBonusElement.textContent;
+        return { basiliskBonus, jormungandrBonus };
+    });
+    expect(bonuses.basiliskBonus).toBe('+400 \u{1F5FF}');
+    expect(bonuses.jormungandrBonus).toBe('+1000 \u{1F409}');
 });
 
 test('an arrow key does not dismiss an announcement either', async ({ game }) => {

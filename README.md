@@ -56,12 +56,13 @@ can earn all three.
   something. It also banks a **free life**: whatever kills the run next (wall,
   self-collision, rotten apple - any cause) is forgiven instead of
   ending it, respawning the snake as a single tile at the board's
-  center - the same point a fresh game starts from - with a "Saved by
-  Ouroboros!" message in the same style as the announcement overlay
-  (`.respawn-message` reuses `.special-title`/`.special-continue-hint`,
-  just without the rays) and the same double-tap/`R` gate holding
-  movement until you dismiss it. Either way, once you swipe again the
-  snake regrows back out to its old length one tile per move
+  center - the same point a fresh game starts from - with the exact
+  same announcement overlay an egg discovery shows, golden rays
+  included (`beginSpecialEvent('ouroboros', 'Saved by Ouroboros!', '')`
+  in `respawnWithSameLength()` - see "Every pause resumes the same
+  way" below), just with no bonus line, since no points come with being
+  saved. Either way, once you swipe again the snake regrows back out to
+  its old length one tile per move
   (`regrowPending`, see `update()`) instead of snapping back instantly.
   The banked life shows as the first of two hearts next to the score -
   a hollow outline when nothing's banked, filled in once it is (the
@@ -156,15 +157,16 @@ Rules that hold across every state:
 - **A forgiven death never resets progress.** It respawns you at the
   board's center at length 1 and regrows you to your pre-death length;
   the Basilisk's wall and its apple counter both survive it.
-- **Every pause resumes the same way: double-tap or `R`, always.** An
-  egg's announcement overlay (`specialEventOverlayDismissed`) and the
-  message after a free life saves you (`respawnDismissed`) both hold
-  movement until that deliberate confirmation - a direction never
-  doubles as the dismissal, on any device, and anything queued in the
-  meantime is discarded rather than becoming the first move. Dismissing
-  isn't itself a move either: the swipe or arrow key after it is. The
-  reason is sharpest on a respawn, where the death that spent the life
-  is usually a panicked moment mid-swipe - without the gate the snake
+- **Every pause resumes the same way: double-tap or `R`, always.** All
+  four announcements - an egg discovery or a life saved by one, see
+  `beginSpecialEvent()` - are one overlay, one gate
+  (`specialEventWaiting`/`specialEventOverlayDismissed`): movement holds
+  until that deliberate confirmation, a direction never doubles as the
+  dismissal on any device, and anything queued in the meantime is
+  discarded rather than becoming the first move. Dismissing isn't
+  itself a move either: the swipe or arrow key after it is. The reason
+  is sharpest on a respawn, where the death that spent the life is
+  usually a panicked moment mid-swipe - without the gate the snake
   sets off before you've found where it landed, throwing away the life
   you just earned.
 - **No apple exists while the snake is regrowing.** Whichever of the
@@ -225,7 +227,7 @@ silent no-op until it's dismissed.
 | `basilisk.spec.js` | Spawn geometry (sampled over repeated runs), the gaze death, the apple counter, outgazing |
 | `chain.spec.js` | Egg gating, both free lives, full-run score arithmetic, restart, leaderboard badges |
 | `regrow.spec.js` | The no-apple-while-regrowing rule, on all three collapse paths |
-| `gates.spec.js` | Both double-tap/`R` gates - announcements and forgiven deaths - driven through real touch and key events |
+| `gates.spec.js` | The shared announcement overlay/gate - all four triggers, the badge emoji, golden rays on a life saved - driven through real touch and key events |
 
 The suite runs in CI as a gate on the deploy (see below), so a push that
 breaks the chain fails before it reaches Pages.
