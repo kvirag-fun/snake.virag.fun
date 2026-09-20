@@ -665,6 +665,7 @@
                 <li>Four difficulty levels change how fast the snake moves - Viper is slowest, King Cobra fastest.</li>
                 <li>Each difficulty has its own global top-5 leaderboard, shared by everyone who plays.</li>
                 <li>Make the top 5 and you can add an optional nickname.</li>
+                <li>Whenever the snake is regrowing, no apple appears until it's back to full length.</li>
             </ul>
 
             <div class="panel-title">Fairytales</div>
@@ -1388,18 +1389,22 @@
                 });
             }
 
-            // Draw food with stem
-            ctx.fillStyle = '#ff0000';  // Red apple outline
-            ctx.fillRect(food.x * gridSize + 2, food.y * gridSize + 4, gridSize - 4, gridSize - 6);
-            
-            ctx.fillStyle = '#B5514D';  // Red apple middle
-            ctx.fillRect(food.x * gridSize + 2, food.y * gridSize + 4, gridSize - 6, gridSize - 8);
-            
-            ctx.fillStyle = '#2b1d0e';  // Dark brown stem
-            ctx.fillRect(food.x * gridSize + 8, food.y * gridSize, 4, 4);
-            
-            ctx.fillStyle = '#32CD32';  // Lime green leaf
-            ctx.fillRect(food.x * gridSize + 13, food.y * gridSize + 1, 3, 2);
+            // Draw food with stem - hidden entirely while the snake is
+            // still regrowing (see update()), so a collapse is followed by
+            // a stretch of pure navigation before there's anything to eat.
+            if (regrowPending === 0) {
+                ctx.fillStyle = '#ff0000';  // Red apple outline
+                ctx.fillRect(food.x * gridSize + 2, food.y * gridSize + 4, gridSize - 4, gridSize - 6);
+
+                ctx.fillStyle = '#B5514D';  // Red apple middle
+                ctx.fillRect(food.x * gridSize + 2, food.y * gridSize + 4, gridSize - 6, gridSize - 8);
+
+                ctx.fillStyle = '#2b1d0e';  // Dark brown stem
+                ctx.fillRect(food.x * gridSize + 8, food.y * gridSize, 4, 4);
+
+                ctx.fillStyle = '#32CD32';  // Lime green leaf
+                ctx.fillRect(food.x * gridSize + 13, food.y * gridSize + 1, 3, 2);
+            }
 
             for (const badFood of badFoodList) {
                 const px = badFood.x * gridSize;  // cache pixel X
@@ -1567,8 +1572,11 @@
             dx = nextDx;
             dy = nextDy;
             
-            // Check food collision
-            const ateFood = head.x === food.x && head.y === food.y;
+            // Check food collision - no apple is on the board at all
+            // while the snake is still regrowing (see the regrow branch
+            // below and drawGame()), so this can't fire until it's back
+            // to full length.
+            const ateFood = regrowPending === 0 && head.x === food.x && head.y === food.y;
             if (ateFood) {
 
                 // Play sound
@@ -1593,8 +1601,17 @@
             } else if (regrowPending > 0) {
                 // Regrowing one tile per move after an Ouroboros collapse
                 // or a forgiven death's respawn - don't pop the tail until
-                // back to the old length.
+                // back to the old length. No apple exists during this
+                // stretch, so you have to re-earn your length by pure
+                // navigation before anything can be eaten: the Basilisk's
+                // 15 apples are then fought at full size, not while
+                // conveniently short.
                 regrowPending--;
+                if (regrowPending === 0) {
+                    // Back to full length - place the first apple now,
+                    // clear of the body it has to avoid landing under.
+                    randomFood();
+                }
             } else {
                 snake.pop();
             }
@@ -1831,10 +1848,10 @@
             basiliskLifeAvailable = true;
             updateExtraLifeIndicator();
 
-            score += 750;
+            score += 400;
             scoreElement.textContent = score;
 
-            beginSpecialEvent('basilisk', 'Basilisk Outgazed!', '+750');
+            beginSpecialEvent('basilisk', 'Basilisk Outgazed!', '+400');
         }
 
         function beginSpecialEvent(kind, title, bonus) {

@@ -105,7 +105,7 @@ can earn all three.
   regrowing back out one tile per move once play resumes (`regrowPending`),
   and banking its own **free life** - the second heart next to the score,
   independent of Ouroboros's own (both can be banked at once; a death
-  spends Ouroboros's first - see `handleDeath()`) - +750, 🗿 badge,
+  spends Ouroboros's first - see `handleDeath()`) - +400, 🗿 badge,
   deliberately doesn't change the snake's body color (see below) - the
   one permanent trace it leaves is the snake's own eyes turning the
   same dark purple as the Basilisk's, for the rest of the run. Only
@@ -153,6 +153,15 @@ Rules that hold across every state:
 - **A forgiven death never resets progress.** It respawns you at the
   board's center at length 1 and regrows you to your pre-death length;
   the Basilisk's wall and its apple counter both survive it.
+- **No apple exists while the snake is regrowing.** Whichever of the
+  three collapses put it back to a single tile - the Ouroboros bite, a
+  forgiven death, or outgazing the Basilisk - no food is drawn or
+  eatable until `regrowPending` hits 0, at which point a fresh apple is
+  placed clear of the body. One check in `update()` and one in
+  `drawGame()`, both keyed on that counter, so all three paths get it.
+  The point is the Basilisk: its 15 apples would otherwise be eaten
+  while conveniently short, so this forces the fight at full length -
+  you pay in difficulty for the free life it banks.
 - **Bonuses never affect difficulty.** Speed is driven by `pacingScore`,
   which counts only real apples - the three bonuses are added to `score`
   alone, so chasing them costs nothing in pace.

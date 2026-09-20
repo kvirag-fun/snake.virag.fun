@@ -13,15 +13,17 @@ service cloud.firestore {
         && request.resource.data.difficulty in ['0.00', '0.25', '0.50', '1.00']
         && request.resource.data.score is int
         && request.resource.data.score >= 0
-        // 20x20 board, +10 per food - max possible run is well under 4000,
-        // plus one-time bonuses from the Ouroboros/Jörmungandr/Basilisk
-        // easter eggs (see index.html), which a single run can get all
-        // three of (Jörmungandr and the Basilisk both require Ouroboros
-        // to have fired first, but are independent of each other after
-        // that). Deliberately generous headroom above the actual current
-        // total rather than tracking it exactly - it only needs to catch
-        // scores no real run could produce, not chase every bonus tweak.
-        && request.resource.data.score <= 7500
+        // 20x20 board, +10 per food: the snake can reach at most 400
+        // tiles from a start of 1, so at most 399 apples = 3990. On top
+        // of that come the one-time easter-egg bonuses (see index.html),
+        // all three of which a single run can collect since they fire in
+        // a strict chain: Ouroboros (at most +400, scaled by the length
+        // it was bitten at) -> Basilisk (+400 flat) -> Jörmungandr
+        // (+1000). Theoretical ceiling: 3990 + 400 + 400 + 1000 = 5790.
+        // Rounded up to 6000 for headroom - the point is to reject scores
+        // no real run could produce, not to track the exact total, so
+        // small bonus tweaks don't need a rule change.
+        && request.resource.data.score <= 6000
         // Optional nickname, entered client-side when a run actually
         // qualifies for the top 5. This is a charset/length guard only -
         // profanity filtering happens client-side (see index.html) since
