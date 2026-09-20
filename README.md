@@ -24,8 +24,8 @@ installable as a PWA. Live at
   a from-scratch pixel-art "S" icon built from the game's own in-game
   colors (see `public/icon-*.png`, `public/tab_icon.ico`,
   `public/apple-touch-icon.png`), not derived from the splash artwork.
-- **Sound effects** for eating food and game over (toggleable), plus a
-  splash screen shown before a run starts.
+- **Looping 8-bit theme song** (toggleable), plus a splash screen shown
+  before a run starts.
 - **Double-tap to restart** on touch devices, `R` on keyboard.
 
 ## Board size
@@ -361,6 +361,7 @@ and connects to the emulator instead of production.
 | `public/icon-192.png`, `public/icon-512.png`, `public/apple-touch-icon.png` | PWA/home-screen icons (segmented pixel-art render, with head/eye detail) |
 | `public/snake_splash_screen.png` | Splash screen shown before a run starts |
 | `public/snake_gameover_wall.png`, `public/snake_gameover_self.png`, `public/snake_gameover_rotten.png`, `public/snake_gameover_gaze.png` | Game-over screens, one per death cause (`gaze`'s snake is the same art, recolored stone-gray) |
+| `public/theme.mp3` | The looping theme song (toggled by the same checkbox that used to gate the old sound effects) - `preload="none"`, since at ~3MB it's far heavier than every other `public/` asset combined and should only be fetched once sound is actually turned on |
 
 All five canvas images are stored at **400x400** - originally an exact
 match for the canvas's fixed backing store, before it grew to
@@ -379,4 +380,3 @@ The pre-resize 1024x1024 originals are kept in `art-src/` (not built or
 deployed - Vite only serves `public/`) in case the canvas grows enough
 that the upscale becomes noticeable and the art needs re-exporting at a
 larger size, so no one has to go digging through git history for them.
-| `public/food.mp3`, `public/ugh_05s.mp3` | Sound effects (eating food, game over) |

@@ -567,11 +567,12 @@
     </style>
 </head>
 <body>
-    <audio id="gameOverSound" preload="auto">
-        <source src="ugh_05s.mp3" type="audio/mpeg">
-    </audio>
-    <audio id="foodEatingSound" preload="auto">
-        <source src="food.mp3" type="audio/mpeg">
+    <!-- preload="none": at 3MB this is far heavier than any other public/
+         asset (the splash/game-over art was deliberately kept small for
+         load time - see README), so it should only ever be fetched once
+         sound is actually turned on, never on every page load. -->
+    <audio id="themeSong" preload="none" loop>
+        <source src="theme.mp3" type="audio/mpeg">
     </audio>
 
     <header class="topbar">
@@ -789,18 +790,21 @@
         const soundToggle = document.getElementById('soundToggle');
         const difficultySelect = document.getElementById('difficultySelect');
 
-        // Re-triggering one shared <audio> element (resetting currentTime
-        // and calling play() again) races with itself when it fires again
-        // before the previous play has settled - eating food twice in
-        // quick succession is exactly that, and the browser can reject
-        // the second play() with an AbortError, silently, mid-clip. A
-        // fresh clone per trigger has its own independent playback state,
-        // so overlapping triggers can't collide.
-        function playSoundEffect(elementId) {
-            if (!soundToggle.checked) return;
-            const clone = document.getElementById(elementId).cloneNode(true);
-            clone.play().catch(e => console.log('Sound play failed:', e));
-        }
+        // The theme just loops continuously in the background for as long
+        // as the checkbox is on - checking it is itself the user gesture
+        // that satisfies the browser's autoplay policy, so play() here
+        // never needs to piggyback on some other interaction. Unchecking
+        // pauses rather than resetting currentTime, so turning it back on
+        // resumes from where it left off instead of restarting the loop.
+        const themeSong = document.getElementById('themeSong');
+        themeSong.volume = 0.5;
+        soundToggle.addEventListener('change', () => {
+            if (soundToggle.checked) {
+                themeSong.play().catch(e => console.log('Music play failed:', e));
+            } else {
+                themeSong.pause();
+            }
+        });
 
         difficultySelect.addEventListener('change', function() {
             if (!gameRunning) {
@@ -1674,9 +1678,6 @@
             const ateFood = regrowPending === 0 && head.x === food.x && head.y === food.y;
             if (ateFood) {
 
-                // Play sound
-                playSoundEffect('foodEatingSound');
-
                 score += 10;
                 pacingScore += 10;
                 scoreElement.textContent = score;
@@ -2159,9 +2160,6 @@
 
             // Toggle difficulty selector to ON
             toggleDifficultySelector();
-
-            // Play sound
-            playSoundEffect('gameOverSound');
         }
 
         // Restart game
