@@ -476,9 +476,10 @@
             opacity: 0.85;
         }
 
-        /* Light-touch equivalent shown after the banked Ouroboros life is
-           actually spent - no pause, no rays, just a quick "here's what
-           happened" that clears itself the moment you move. */
+        /* Shown after a banked life is actually spent - no rays, but it
+           does hold movement until a deliberate double-tap, the same as a
+           special-event overlay (see respawnDismissed): the swipe that was
+           in flight when the snake died must not carry into its new life. */
         .respawn-message {
             position: absolute;
             top: 20px;
@@ -492,6 +493,12 @@
             color: var(--markup);
             text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85), 0 0 6px rgba(0, 0, 0, 0.6);
             pointer-events: none;
+        }
+
+        .respawn-message .respawn-hint {
+            font-size: 11px;
+            margin-top: 6px;
+            opacity: 0.85;
         }
 
         /* Same reasoning as body.playing above - only disable native touch
@@ -640,7 +647,10 @@
                 <div class="special-bonus" id="specialOverlayBonus"></div>
                 <div class="special-continue-hint">Double-tap or press R to continue.</div>
             </div>
-            <div id="respawnMessage" class="respawn-message" hidden>Saved by Ouroboros! Choose a direction.</div>
+            <div id="respawnMessage" class="respawn-message" hidden>
+                <div>Saved by Ouroboros!</div>
+                <div class="respawn-hint">Double-tap or press R, then choose a direction.</div>
+            </div>
         </div>
     </main>
 
@@ -656,6 +666,7 @@
                 <li>Arrow keys or swipe to steer.</li>
                 <li>A swipe can start anywhere on the page, not just on the canvas.</li>
                 <li>Double-tap the canvas or press <strong>R</strong> to restart after a game over.</li>
+                <li>The same double-tap resumes play after an announcement, or after a free life saves you - a stray swipe can't set you moving again by itself.</li>
             </ul>
 
             <div class="panel-title">Rules</div>
@@ -1004,11 +1015,17 @@
         // death's respawn.
         let regrowPending = 0;
         // True while the post-respawn "pick a direction" message is up -
-        // cleared the moment a real direction arrives, same idea as the
-        // special-event overlays but without blocking movement or needing
-        // a double-tap (there's nothing left to protect against - the
-        // life is already spent).
+        // cleared the moment a real direction arrives. Gated exactly like
+        // a special-event overlay: movement waits for a deliberate
+        // double-tap (or an arrow key / R on a keyboard) before any swipe
+        // counts as a direction. The death that spent the life is usually
+        // a panicked moment mid-swipe, so without the gate a stray touch
+        // sets the snake moving again before the player has even found
+        // where it respawned - which throws away the life they just
+        // earned.
         let respawnMessageShowing = false;
+        let respawnDismissed = false;
+        let respawnLastTap = 0;
 
         // Which snake color to draw - sticks after whichever of Ouroboros/
         // Jörmungandr fired most recently. Outgazing the Basilisk never
@@ -1487,6 +1504,14 @@
                 return;
             }
 
+            // The respawn after a forgiven death waits the same way, and
+            // for the same reason: whatever swipe was in flight when the
+            // snake died must not carry over into its new life.
+            if (respawnMessageShowing && !respawnDismissed) {
+                inputQueue = [];
+                return;
+            }
+
             // Get next direction from queue OR use current dx/dy
             let nextDx = dx;
             let nextDy = dy;
@@ -1722,6 +1747,7 @@
             randomBadFood();
 
             respawnMessageShowing = true;
+            respawnDismissed = false;
             respawnMessageElement.hidden = false;
         }
 
@@ -1953,6 +1979,7 @@
             specialEventOverlayDismissed = false;
             hideSpecialOverlay();
             respawnMessageShowing = false;
+            respawnDismissed = false;
             respawnMessageElement.hidden = true;
 
             if (splashLoaded) {
@@ -1996,6 +2023,12 @@
                 return;
             }
 
+            // Same for the post-respawn message's own gate.
+            if (e.keyCode === R && respawnMessageShowing && !respawnDismissed && e.target.tagName !== 'INPUT') {
+                respawnDismissed = true;
+                return;
+            }
+
             if (!gameRunning) return;
 
             // Touch requires a double-tap to dismiss a special-event
@@ -2006,6 +2039,14 @@
                 && (e.keyCode === LEFT || e.keyCode === UP || e.keyCode === RIGHT || e.keyCode === DOWN)) {
                 specialEventOverlayDismissed = true;
                 hideSpecialOverlay();
+            }
+
+            // Likewise for the respawn message - an arrow key is a
+            // deliberate press, so it dismisses and picks the direction at
+            // once; only touch has to double-tap first.
+            if (respawnMessageShowing && !respawnDismissed
+                && (e.keyCode === LEFT || e.keyCode === UP || e.keyCode === RIGHT || e.keyCode === DOWN)) {
+                respawnDismissed = true;
             }
 
             // Decide what the "current" direction is for validation
@@ -2121,6 +2162,19 @@
                     hideSpecialOverlay();
                 }
                 specialEventLastTap = now;
+                return;
+            }
+
+            // Double-tap to start moving again after a forgiven death -
+            // the swipe that follows sets the direction, not this tap.
+            if (gameRunning && respawnMessageShowing && !respawnDismissed) {
+                const now = new Date().getTime();
+                const tapLength = now - respawnLastTap;
+
+                if (tapLength < doubleTapDelay && tapLength > 0) {
+                    respawnDismissed = true;
+                }
+                respawnLastTap = now;
                 return;
             }
 

@@ -153,6 +153,14 @@ Rules that hold across every state:
 - **A forgiven death never resets progress.** It respawns you at the
   board's center at length 1 and regrows you to your pre-death length;
   the Basilisk's wall and its apple counter both survive it.
+- **Spending a life holds movement until you double-tap.** Same gate as
+  an egg's announcement overlay (`respawnDismissed`, see `update()` and
+  the `touchend` handler): a swipe on its own is discarded rather than
+  becoming the new life's first direction. The death that spent the life
+  is usually a panicked moment mid-swipe, so without it the snake sets
+  off before you've found where it respawned - throwing away the life
+  you just earned. On a keyboard an arrow key is already deliberate, so
+  it dismisses and steers in one press; `R` dismisses without steering.
 - **No apple exists while the snake is regrowing.** Whichever of the
   three collapses put it back to a single tile - the Ouroboros bite, a
   forgiven death, or outgazing the Basilisk - no food is drawn or
@@ -211,6 +219,7 @@ silent no-op until it's dismissed.
 | `basilisk.spec.js` | Spawn geometry (sampled over repeated runs), the gaze death, the apple counter, outgazing |
 | `chain.spec.js` | Egg gating, both free lives, full-run score arithmetic, restart, leaderboard badges |
 | `regrow.spec.js` | The no-apple-while-regrowing rule, on all three collapse paths |
+| `respawn-gate.spec.js` | The double-tap gate after a forgiven death, driven through real touch and key events |
 
 The suite runs in CI as a gate on the deploy (see below), so a push that
 breaks the chain fails before it reaches Pages.

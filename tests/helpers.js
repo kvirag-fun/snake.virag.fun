@@ -104,9 +104,18 @@ function installHelpers() {
             }
             return eaten;
         },
+        // Clear the post-respawn double-tap gate, as a double-tap or an
+        // arrow key would. The gate itself is tested through real input in
+        // respawn-gate.spec.js; everywhere else it's just in the way.
+        dismissRespawn() {
+            respawnDismissed = true;
+        },
         // Run the snake into the right wall - a death from a known cause,
-        // used to test what forgives it.
+        // used to test what forgives it. Dismisses a pending respawn gate
+        // first, so a second call actually reaches the wall instead of
+        // being held by the message from the first one.
         killIntoWall() {
+            this.dismissRespawn();
             snake[0] = { x: tileCount - 1, y: snake[0].y };
             dx = 1;
             dy = 0;
@@ -116,6 +125,7 @@ function installHelpers() {
         // report whether it ever got eaten. Used to prove the apple is
         // uneatable while the snake is regrowing.
         tryToEatWhileRegrowing(steps) {
+            this.dismissRespawn();
             let eaten = false;
             for (let i = 0; i < steps && regrowPending > 0; i++) {
                 const head = snake[0];
@@ -145,6 +155,7 @@ function installHelpers() {
         },
         // Regrow all the way back to full length without eating anything.
         finishRegrow() {
+            this.dismissRespawn();
             let guard = 0;
             while (regrowPending > 0 && guard++ < 200) this.stepWithoutEating();
         },
@@ -168,6 +179,8 @@ function installHelpers() {
                 gameRunning,
                 deathCause,
                 regrowPending,
+                respawnMessageShowing,
+                respawnDismissed,
                 snakeColorMode,
                 ouroborosTriggered,
                 basiliskTriggered,

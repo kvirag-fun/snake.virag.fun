@@ -19,7 +19,9 @@ export default defineConfig({
         trace: 'retain-on-failure',
     },
     projects: [
-        { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+        // hasTouch so the double-tap gates can be driven through real
+        // touch events rather than by poking at the handlers' state.
+        { name: 'chromium', use: { ...devices['Desktop Chrome'], hasTouch: true } },
     ],
     // Tests run against the dev server, not the built bundle: it serves
     // index.html as-is, which is what the specs poke at. Firebase points
