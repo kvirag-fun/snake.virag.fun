@@ -93,8 +93,11 @@ test('a double-tap opens the gate, and the swipe after it moves', async ({ game 
 
     const dismissed = await game.evaluate(() => window.__game.state());
     expect(dismissed.respawnDismissed).toBe(true);
-    // Dismissing is not itself a move - the snake waits for a direction.
+    // Dismissing is not itself a move - the snake still waits for a
+    // direction - but the text disappears right away, the same as the
+    // announcement overlay does on its own double-tap.
     expect(dismissed.respawnMessageShowing).toBe(true);
+    await expect(game.locator('#respawnMessage')).toBeHidden();
 
     const result = await game.evaluate(() => {
         const h = window.__game;
@@ -156,8 +159,13 @@ test('R then an arrow key is the keyboard sequence that moves', async ({ game })
 test('R dismisses without picking a direction', async ({ game }) => {
     await spendALife(game);
     const before = await game.evaluate(() => ({ ...snake[0] }));
+    await expect(game.locator('#respawnMessage')).toBeVisible();
 
     await game.keyboard.press('r');
+    // Same as a double-tap: the text disappears the moment R dismisses,
+    // not only once a direction actually arrives.
+    await expect(game.locator('#respawnMessage')).toBeHidden();
+
     const result = await game.evaluate(() => {
         const h = window.__game;
         h.step();

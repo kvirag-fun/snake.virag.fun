@@ -56,9 +56,12 @@ can earn all three.
   something. It also banks a **free life**: whatever kills the run next (wall,
   self-collision, rotten apple - any cause) is forgiven instead of
   ending it, respawning the snake as a single tile at the board's
-  center - the same point a fresh game starts from - with a brief
-  "Saved by Ouroboros!" message and no pause. Either way, once you swipe
-  again the snake regrows back out to its old length one tile per move
+  center - the same point a fresh game starts from - with a "Saved by
+  Ouroboros!" message in the same style as the announcement overlay
+  (`.respawn-message` reuses `.special-title`/`.special-continue-hint`,
+  just without the rays) and the same double-tap/`R` gate holding
+  movement until you dismiss it. Either way, once you swipe again the
+  snake regrows back out to its old length one tile per move
   (`regrowPending`, see `update()`) instead of snapping back instantly.
   The banked life shows as the first of two hearts next to the score -
   a hollow outline when nothing's banked, filled in once it is (the
