@@ -476,29 +476,6 @@
             opacity: 0.85;
         }
 
-        /* Same look as the special-event overlay it echoes (identical
-           positioning/color, and it reuses .special-title/.special-
-           continue-hint for the two lines of text) minus the rays - those
-           are drawn on the canvas by drawSpecialRays(), which this never
-           calls. It holds movement until a deliberate double-tap or R, the
-           same as a special-event overlay (see respawnDismissed): the
-           swipe that was in flight when the snake died must not carry
-           into its new life. */
-        .respawn-message {
-            position: absolute;
-            top: 50%;
-            left: 10px;
-            right: 10px;
-            transform: translateY(-50%);
-            text-align: center;
-            font-family: var(--font-mono);
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: crimson;
-            text-shadow: 0 1px 4px rgba(0, 0, 0, 0.85), 0 0 8px rgba(220, 20, 60, 0.6);
-            pointer-events: none;
-        }
-
         /* Same reasoning as body.playing above - only disable native touch
            gestures over the leaderboard/settings row while a run is
            actually in progress (so a swipe starting there still steers,
@@ -645,9 +622,17 @@
                 <div class="special-bonus" id="specialOverlayBonus"></div>
                 <div class="special-continue-hint">Double-tap or press R to continue.</div>
             </div>
-            <div id="respawnMessage" class="respawn-message" hidden>
+            <!-- The special-overlay class is what makes .special-title/
+                 .special-continue-hint actually apply their sizing - those
+                 selectors are scoped to a .special-overlay ancestor. Only
+                 real difference from an announcement: no rays, since this
+                 never calls drawSpecialRays(). It holds movement until a
+                 deliberate double-tap or R (respawnDismissed) - the swipe
+                 in flight when the snake died must not carry into its new
+                 life. -->
+            <div id="respawnMessage" class="respawn-message special-overlay" hidden>
                 <div class="special-title">Saved by Ouroboros!</div>
-                <div class="special-continue-hint">Double-tap or press R, then choose a direction.</div>
+                <div class="special-continue-hint">Double-tap or press R to continue.</div>
             </div>
         </div>
     </main>
