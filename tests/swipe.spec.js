@@ -99,28 +99,35 @@ test('a long same-direction drag does not pile up redundant queue entries', asyn
     expect(queued).toEqual([{ dx: 1, dy: 0 }]);
 });
 
-test("a redundant same-axis reconfirmation doesn't discard the other axis's progress toward a real turn", async ({ game }) => {
-    // The exact shape of the bug this guards: after turning down, further
-    // travel that's still primarily downward (ordinary noise in a real
-    // swipe, not a clean two-segment path) can re-cross the 20px
-    // threshold in that same direction again - not a new turn, nothing
-    // gets queued for it, but it still has to decide whether to reset the
-    // touch reference point. If it reset *both* axes' reference points
-    // (rather than just the one that redundantly reconfirmed), it would
-    // silently erase whatever leftward progress had already built up on
-    // the other axis, and a real U-turn gesture would intermittently
-    // drop its second turn depending on the precise noise shape.
+test('a diagonal drag - never perfectly axis-aligned, the normal case for a real thumb - does not fire the axis it never meant to turn on', async ({ game }) => {
+    // A version of the reference-point reset once shipped that only reset
+    // the axis that had just fired (to avoid discarding a perpendicular
+    // U-turn already in progress), leaving the *other* axis's reference
+    // point untouched on a redundant same-direction reconfirmation. That
+    // seemed safe in isolation, but a swipe is essentially never perfectly
+    // axis-aligned - there's always some diagonal component from how a
+    // thumb actually moves - and with only one axis resetting, the other
+    // axis's delta had nothing bounding it: over a normal-length drag it
+    // would eventually cross its own 20px threshold too, on this test's
+    // numbers well before the drag even ends, firing a direction ("down")
+    // the player never swiped for. Confirmed live: a swipe as little as
+    // ~10 degrees off horizontal reliably triggered it. Both axes
+    // resetting together on every resolved swipe - not just a genuine new
+    // direction - is what keeps the never-fired axis's delta bounded.
     await setUpSnake(game);
+    await game.evaluate(() => { dx = 0; dy = 1; });  // heading down, so rightward is a genuine turn
     const touch = await cdpTouch(game);
     const { x, y } = await boardOrigin(game);
 
     await touch.down(x, y);
-    await touch.move(x, y + 30);        // down - a real turn, resets both axes here
-    await touch.move(x - 15, y + 33);   // 15px of leftward progress - below the 20px threshold yet
-    await touch.move(x - 13, y + 55);   // still-mostly-down noise re-crosses 20px downward again
-    await touch.move(x - 22, y + 58);   // the 15px of leftward progress plus a little more crosses 20px
+    // A steady rightward drag at a consistent ~17 degree diagonal (3px
+    // down for every 10px right) - well within normal thumb variance, not
+    // an extreme case.
+    for (let dx = 10; dx <= 160; dx += 10) {
+        await touch.move(x + dx, y + dx * 0.3);
+    }
+    await touch.up();
 
     const queued = await game.evaluate(() => window.__queued);
-    expect(queued).toEqual([{ dx: 0, dy: 1 }, { dx: -1, dy: 0 }]);
-    await touch.up();
+    expect(queued).toEqual([{ dx: 1, dy: 0 }]);
 });
