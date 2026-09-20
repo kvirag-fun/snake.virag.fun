@@ -2290,16 +2290,16 @@
         // tell direction, not on touchend - waiting for the finger to lift
         // stacks a full gesture's worth of delay (down, travel, lift) on
         // top of the travel itself, which is what actually made this feel
-        // laggy next to keydown's instant response. After a turn triggers,
-        // the reference point resets to wherever the finger is right now
-        // (rather than a one-shot flag for the whole gesture), so a single
-        // continuous drag can chain multiple turns - e.g. right then down
-        // then left - without ever lifting the finger, the same way you'd
-        // tap several arrow keys in a row. Pushed through the same
-        // inputQueue keyboard uses (rather than writing dx/dy directly, as
-        // this used to) so a swipe and a still-pending keyboard turn
-        // resolve in the order they happened, not by whichever line of
-        // code ran last.
+        // laggy next to keydown's instant response. After an axis resolves,
+        // that axis's own reference point resets to wherever the finger is
+        // right now (rather than a one-shot flag for the whole gesture), so
+        // a single continuous drag can chain multiple turns - e.g. right
+        // then down then left - without ever lifting the finger, the same
+        // way you'd tap several arrow keys in a row. Pushed through the
+        // same inputQueue keyboard uses (rather than writing dx/dy
+        // directly, as this used to) so a swipe and a still-pending
+        // keyboard turn resolve in the order they happened, not by
+        // whichever line of code ran last.
         //
         // Only pushed when the resolved direction actually differs from
         // the current one - a single long drag fires touchmove many times
@@ -2308,6 +2308,24 @@
         // without this check a long swipe piles up a backlog of redundant
         // same-direction entries that the snake visibly lags behind while
         // it works through.
+        //
+        // The two reference points (touchStartX/Y) don't always reset
+        // together. A genuine new turn resets both - there's nothing on
+        // the other axis worth keeping once you've actually turned, same
+        // as a fresh gesture start. But a drag that's still nominally
+        // "going down" can re-cross the threshold in that same direction
+        // again well after a U-turn has actually started (ordinary noise
+        // in a real swipe, not just a clean two-segment path) - that's not
+        // a turn (nothing new to push), just the redundant-direction guard
+        // above declining to re-queue it, and if it reset *both*
+        // coordinates anyway, it would silently discard whatever progress
+        // the perpendicular axis (the turn actually being attempted) had
+        // already built up - making a real U-turn gesture intermittently
+        // drop its second turn depending on the exact shape of the noise.
+        // So a redundant reconfirmation resets only the axis that fired -
+        // still keeping that axis's own delta from growing without bound
+        // (needed for the same reason as the redundant-push guard above),
+        // just without touching the other axis's unrelated progress.
         document.addEventListener('touchmove', (e) => {
             if (touchIsOnControl || !gameRunning) return;
             e.preventDefault();
@@ -2317,28 +2335,31 @@
             const deltaX = touchX - touchStartX;
             const deltaY = touchY - touchStartY;
             const lastDir = inputQueue.length > 0 ? inputQueue.at(-1) : { dx, dy };
-            let turned = true;
             let newDir = null;
 
             if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > minSwipeDistance) {
                 if (deltaX > 0 && lastDir.dx !== -1) newDir = { dx: 1, dy: 0 };  // Right
                 else if (deltaX < 0 && lastDir.dx !== 1) newDir = { dx: -1, dy: 0 };  // Left
-                else turned = false;
             } else if (Math.abs(deltaY) > minSwipeDistance) {
                 if (deltaY > 0 && lastDir.dy !== -1) newDir = { dx: 0, dy: 1 };  // Down
                 else if (deltaY < 0 && lastDir.dy !== 1) newDir = { dx: 0, dy: -1 };  // Up
-                else turned = false;
-            } else {
-                turned = false;
             }
 
-            if (newDir && (newDir.dx !== lastDir.dx || newDir.dy !== lastDir.dy)) {
-                inputQueue.push(newDir);
-            }
-
-            if (turned) {
-                touchStartX = touchX;
-                touchStartY = touchY;
+            if (newDir) {
+                const isNewDirection = newDir.dx !== lastDir.dx || newDir.dy !== lastDir.dy;
+                if (isNewDirection) {
+                    // A genuine turn - refresh both axes, the same as any
+                    // fresh start: the perpendicular axis's old progress
+                    // was on its way toward *this* turn, not a further one
+                    // past it, so there's nothing worth preserving there.
+                    inputQueue.push(newDir);
+                    touchStartX = touchX;
+                    touchStartY = touchY;
+                } else if (newDir.dx !== 0) {
+                    touchStartX = touchX;  // redundant same-direction reconfirmation
+                } else {
+                    touchStartY = touchY;
+                }
             }
         }, { passive: false });
 

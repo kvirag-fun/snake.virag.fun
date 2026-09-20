@@ -279,8 +279,9 @@ silent no-op until it's dismissed.
 | `ouroboros.spec.js` | The scaled bonus curve, the collapse, the free life, once-per-run |
 | `basilisk.spec.js` | Spawn geometry (sampled over repeated runs), the gaze death, the apple counter, the 4-stage split and its randomisation, outgazing |
 | `chain.spec.js` | Egg gating, both free lives, full-run score arithmetic, restart, leaderboard badges |
-| `regrow.spec.js` | The no-apple-while-regrowing rule, on all three collapse paths |
+| `regrow.spec.js` | The no-apple-while-regrowing rule, on all four collapse paths |
 | `gates.spec.js` | The shared announcement overlay/gate - all four triggers, the badge emoji, golden rays on a life saved - driven through real touch and key events |
+| `swipe.spec.js` | The touch swipe-to-direction resolution itself - blocked reversals, chaining multiple turns in one continuous drag, and the two reference points' independent reset rules - driven through raw CDP touch events (`Input.dispatchTouchEvent`), not just poking `inputQueue` |
 
 The suite runs in CI as a gate on the deploy (see below), so a push that
 breaks the chain fails before it reaches Pages.
