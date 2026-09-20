@@ -666,7 +666,7 @@
                 <li>Arrow keys or swipe to steer.</li>
                 <li>A swipe can start anywhere on the page, not just on the canvas.</li>
                 <li>Double-tap the canvas or press <strong>R</strong> to restart after a game over.</li>
-                <li>The same double-tap resumes play after an announcement, or after a free life saves you - a stray swipe can't set you moving again by itself.</li>
+                <li>Double-tap or <strong>R</strong> also resumes play after an announcement, or after a free life saves you - always, on every device. Steering alone never resumes it, so a stray swipe or keypress can't set you moving again by itself.</li>
             </ul>
 
             <div class="panel-title">Rules</div>
@@ -1017,8 +1017,8 @@
         // True while the post-respawn "pick a direction" message is up -
         // cleared the moment a real direction arrives. Gated exactly like
         // a special-event overlay: movement waits for a deliberate
-        // double-tap (or an arrow key / R on a keyboard) before any swipe
-        // counts as a direction. The death that spent the life is usually
+        // double-tap or R before any swipe or arrow key counts as a
+        // direction. The death that spent the life is usually
         // a panicked moment mid-swipe, so without the gate a stray touch
         // sets the snake moving again before the player has even found
         // where it respawned - which throws away the life they just
@@ -1495,8 +1495,8 @@
         function update() {
             if (!gameRunning) return;
 
-            // A special-event overlay needs a double-tap (or an arrow key -
-            // see the keydown handler) to dismiss before any swipe/key
+            // A special-event overlay needs a double-tap or R (see the
+            // touchend/keydown handlers) to dismiss before any swipe/key
             // counts as a direction - discard anything that snuck into
             // the queue in the meantime so it can't become the first move.
             if (specialEventWaiting && !specialEventOverlayDismissed) {
@@ -2014,16 +2014,17 @@
                 return; // Don't process direction change after restart
             }
 
-            // R dismisses a special-event overlay, the same as a double-tap -
-            // it isn't a direction, so (unlike an arrow key) it only
-            // dismisses; a swipe or arrow key afterwards sets the first move.
+            // R dismisses a special-event overlay, the keyboard's
+            // equivalent of the double-tap. It only dismisses - the swipe
+            // or arrow key afterwards is what sets the first move.
             if (e.keyCode === R && specialEventWaiting && !specialEventOverlayDismissed && e.target.tagName !== 'INPUT') {
                 specialEventOverlayDismissed = true;
                 hideSpecialOverlay();
                 return;
             }
 
-            // Same for the post-respawn message's own gate.
+            // Same for the post-respawn message's own gate, and for the
+            // same reason.
             if (e.keyCode === R && respawnMessageShowing && !respawnDismissed && e.target.tagName !== 'INPUT') {
                 respawnDismissed = true;
                 return;
@@ -2031,23 +2032,12 @@
 
             if (!gameRunning) return;
 
-            // Touch requires a double-tap to dismiss a special-event
-            // overlay before a swipe can set the first direction (see
-            // touchend) - an arrow key press is already unambiguous, so it
-            // dismisses and sets the direction in the same keystroke.
-            if (specialEventWaiting && !specialEventOverlayDismissed
-                && (e.keyCode === LEFT || e.keyCode === UP || e.keyCode === RIGHT || e.keyCode === DOWN)) {
-                specialEventOverlayDismissed = true;
-                hideSpecialOverlay();
-            }
-
-            // Likewise for the respawn message - an arrow key is a
-            // deliberate press, so it dismisses and picks the direction at
-            // once; only touch has to double-tap first.
-            if (respawnMessageShowing && !respawnDismissed
-                && (e.keyCode === LEFT || e.keyCode === UP || e.keyCode === RIGHT || e.keyCode === DOWN)) {
-                respawnDismissed = true;
-            }
+            // Both gates - a special-event overlay and the post-respawn
+            // message - dismiss one way only: a double-tap, or R. A
+            // direction never doubles as the dismissal, whatever the input
+            // device, so the sequence is the same everywhere: confirm you
+            // are ready, then steer. Anything queued meanwhile is dropped
+            // by update() rather than becoming the first move.
 
             // Decide what the "current" direction is for validation
             const lastDir = inputQueue.length > 0 ? inputQueue.at(-1) : { dx, dy };

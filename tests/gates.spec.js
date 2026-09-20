@@ -1,12 +1,16 @@
-// Spending a free life holds movement until a deliberate double-tap.
+// The two "confirm before you steer" gates: an egg's announcement
+// overlay, and the message after a free life saves you. Both hold
+// movement until a double-tap or R - never a direction, on any device.
 //
-// The death that spends the life is usually a panicked moment mid-swipe,
-// so without this gate whatever touch was in flight becomes the new
-// life's first direction - the snake sets off before the player has even
-// found where it respawned, and the life they just earned is thrown
-// away. These tests drive real touch and keyboard input rather than
-// poking at the handlers' state, because the gate is only worth anything
-// if the actual event handlers implement it.
+// The reason is the same for both. Whatever swipe or keypress was in
+// flight when the pause began must not become the first move of what
+// comes after it: for a respawn that means the snake sets off before the
+// player has even found where it landed, throwing away the life they
+// just earned.
+//
+// These specs drive real touch and keyboard events rather than poking at
+// the handlers' state, because a gate is only worth anything if the
+// actual event handlers implement it.
 import { test, expect } from './helpers.js';
 
 // Put the game in the "saved by a free life" state: Ouroboros banked,
@@ -115,7 +119,7 @@ test('two taps far apart are two single taps, not a double-tap', async ({ game }
     expect(await tryToMove(game)).toBe(false);
 });
 
-test('an arrow key dismisses and steers in one press', async ({ game }) => {
+test('an arrow key alone does not open the gate', async ({ game }) => {
     await spendALife(game);
     const before = await game.evaluate(() => ({ ...snake[0] }));
 
@@ -123,11 +127,28 @@ test('an arrow key dismisses and steers in one press', async ({ game }) => {
     const result = await game.evaluate(() => {
         const h = window.__game;
         h.step();
+        h.step();
         return { after: { ...snake[0] }, ...h.state() };
     });
 
-    // A keypress is already deliberate, so unlike touch it needs no
-    // separate dismissal step.
+    // Steering never doubles as the dismissal, on any device - it's
+    // double-tap or R, always.
+    expect(result.respawnDismissed).toBe(false);
+    expect(result.after).toEqual(before);
+});
+
+test('R then an arrow key is the keyboard sequence that moves', async ({ game }) => {
+    await spendALife(game);
+    const before = await game.evaluate(() => ({ ...snake[0] }));
+
+    await game.keyboard.press('r');
+    await game.keyboard.press('ArrowDown');
+    const result = await game.evaluate(() => {
+        const h = window.__game;
+        h.step();
+        return { after: { ...snake[0] }, ...h.state() };
+    });
+
     expect(result.respawnDismissed).toBe(true);
     expect(result.after).toEqual({ x: before.x, y: before.y + 1 });
 });
@@ -178,4 +199,55 @@ test('restarting clears the gate', async ({ game }) => {
     expect(state.respawnMessageShowing).toBe(false);
     expect(state.respawnDismissed).toBe(false);
     await expect(game.locator('#respawnMessage')).toBeHidden();
+});
+
+
+// ---- the announcement overlay's gate ---------------------------------
+
+test('an announcement holds movement until it is dismissed', async ({ game }) => {
+    const state = await game.evaluate(() => {
+        const h = window.__game;
+        h.fireOuroboros();
+        return h.state();
+    });
+    expect(state.specialEventWaiting).toBe(true);
+    await expect(game.locator('#specialOverlay')).toBeVisible();
+    expect(await tryToMove(game)).toBe(false);
+});
+
+test('an arrow key does not dismiss an announcement either', async ({ game }) => {
+    await game.evaluate(() => window.__game.fireOuroboros());
+    await game.keyboard.press('ArrowDown');
+    const moved = await tryToMove(game);
+    expect(moved).toBe(false);
+    await expect(game.locator('#specialOverlay')).toBeVisible();
+});
+
+test('R dismisses an announcement, then a direction resumes play', async ({ game }) => {
+    await game.evaluate(() => window.__game.fireOuroboros());
+    await game.keyboard.press('r');
+    await expect(game.locator('#specialOverlay')).toBeHidden();
+
+    const stillWaiting = await game.evaluate(() => window.__game.state());
+    expect(stillWaiting.specialEventWaiting).toBe(true);   // dismissed, not resumed
+
+    expect(await tryToMove(game)).toBe(true);
+    const state = await game.evaluate(() => window.__game.state());
+    expect(state.specialEventWaiting).toBe(false);
+    // Ouroboros's resume is also what spawns the Basilisk.
+    expect(state.basiliskActive).toBe(true);
+});
+
+test('a double-tap dismisses an announcement', async ({ game }) => {
+    await game.evaluate(() => window.__game.fireOuroboros());
+    await tapCanvas(game, 2);
+    await expect(game.locator('#specialOverlay')).toBeHidden();
+    expect(await tryToMove(game)).toBe(true);
+});
+
+test('a single tap does not dismiss an announcement', async ({ game }) => {
+    await game.evaluate(() => window.__game.fireOuroboros());
+    await tapCanvas(game, 1);
+    await expect(game.locator('#specialOverlay')).toBeVisible();
+    expect(await tryToMove(game)).toBe(false);
 });
