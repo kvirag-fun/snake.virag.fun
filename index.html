@@ -1372,6 +1372,49 @@
             ctx.restore();
         }
 
+        // The Basilisk's 4 possible spawn points (see BASILISK_SPAWN_OFFSETS/
+        // spawnBasilisk()) - marked as dark, sunken holes for as long as
+        // the threat is real: from the instant Ouroboros fires
+        // (ouroborosTriggered) until the Basilisk is actually outgazed
+        // (basiliskTriggered), regardless of whether a wall currently
+        // happens to be up. Purely a warning, not a hazard of its own -
+        // nothing stops the snake walking over one, and food can still
+        // land there. A radial gradient (near-black center, dark gray
+        // rim) reads as depth rather than a flat fill; a light stroke on
+        // the upper-left edge and a dark one on the lower-right fake the
+        // inset-shadow look of an actual pit, the same trick a raised UI
+        // panel uses in reverse.
+        function drawCornerHoles() {
+            const centerX = Math.floor(tileCount / 2);
+            const centerY = Math.floor(tileCount / 2);
+            for (const o of BASILISK_SPAWN_OFFSETS) {
+                const px = (centerX + o.x) * gridSize;
+                const py = (centerY + o.y) * gridSize;
+                const cx = px + gridSize / 2;
+                const cy = py + gridSize / 2;
+
+                const hole = ctx.createRadialGradient(cx, cy, 0, cx, cy, gridSize / 2);
+                hole.addColorStop(0, '#000000');
+                hole.addColorStop(1, '#242424');
+                ctx.fillStyle = hole;
+                ctx.fillRect(px, py, gridSize, gridSize);
+
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+                ctx.beginPath();
+                ctx.moveTo(px + 1, py + gridSize - 1);
+                ctx.lineTo(px + 1, py + 1);
+                ctx.lineTo(px + gridSize - 1, py + 1);
+                ctx.stroke();
+
+                ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
+                ctx.beginPath();
+                ctx.moveTo(px + gridSize - 1, py + 1);
+                ctx.lineTo(px + gridSize - 1, py + gridSize - 1);
+                ctx.lineTo(px + 1, py + gridSize - 1);
+                ctx.stroke();
+            }
+        }
+
         // Draw game elements
         function drawGame() {
             // Clear canvas
@@ -1392,6 +1435,13 @@
             if (!gameRunning && splashLoaded) {
                 drawFitted(splashImage);
                 return;
+            }
+
+            // The 4 corner holes - part of the board surface itself, so
+            // under everything else drawn below (rays, the wall, food,
+            // snake).
+            if (ouroborosTriggered && !basiliskTriggered) {
+                drawCornerHoles();
             }
 
             // The rays are part of the "not yet dismissed" phase, same as
@@ -1825,11 +1875,13 @@
             beginSpecialEvent('jormungandr', 'Jörmungandr Found!', '+1000');
         }
 
-        // The 8 tiles surrounding the board's center (a 3x3 area minus the
-        // middle).
+        // The 4 corner tiles of the 3x3 area around the board's center -
+        // the Basilisk's only possible spawn points (see spawnBasilisk()
+        // below); never the 4 side tiles of that same area. Marked with a
+        // dark "hole" the instant Ouroboros unlocks the threat, long
+        // before any wall actually appears there (see drawCornerHoles()).
         const BASILISK_SPAWN_OFFSETS = [
-            {x: 0, y: -1}, {x: 0, y: 1}, {x: -1, y: 0}, {x: 1, y: 0}, // sides
-            {x: -1, y: -1}, {x: 1, y: -1}, {x: -1, y: 1}, {x: 1, y: 1}, // corners
+            {x: -1, y: -1}, {x: 1, y: -1}, {x: -1, y: 1}, {x: 1, y: 1},
         ];
 
         // Splits BASILISK_TOTAL_FOOD apples across BASILISK_STAGE_COUNT
@@ -1868,20 +1920,24 @@
         // that's what tells this call it's a respawn rather than the
         // first spawn.
         //
-        // The origin is whichever of the 8 tiles surrounding board center
-        // is currently FARTHEST from the snake's head (Manhattan
+        // The origin is whichever of the 4 corner tiles surrounding board
+        // center is currently FARTHEST from the snake's head (Manhattan
         // distance) - not tied to the player's heading at all, so a
         // respawn genuinely reconsiders from scratch based on where the
         // snake actually is by then, not just where it was heading a
-        // moment ago. A side tile (N/S/E/W) has one obvious direction to
-        // grow in - straight out along its own axis, away from center;
-        // a corner tile has two equally valid choices (its row's
-        // direction or its column's), so which one it takes is a coin
-        // flip. Either way the wall only ever grows AWAY from center, one
-        // step at a time - it structurally can never fold back through
-        // the center tile itself, which is where a forgiven death always
-        // respawns (see respawnWithSameLength()) - no separate check
-        // needed for that the way a heading-tied design would require.
+        // moment ago. Every candidate has two equally valid axes to grow
+        // along (its row's direction or its column's), so which one it
+        // takes is a coin flip. Either way the wall only ever grows AWAY
+        // from center, one step at a time - it structurally can never
+        // fold back through the center tile itself, which is where a
+        // forgiven death always respawns (see respawnWithSameLength()) -
+        // no separate check needed for that the way a heading-tied design
+        // would require. It also means the wall can never touch a tile
+        // orthogonally adjacent to center, so a forgiven death's respawn
+        // there always has all 4 directions safe (see the corner-hole
+        // visual on all 4 candidates - see drawCornerHoles() - which is
+        // exactly why marking them as a threat the instant Ouroboros
+        // fires is honest: any of the 4 genuinely could be next).
         //
         // Because "farthest from head" is deterministic (only a corner's
         // direction is randomised), a respawn could otherwise legitimately
@@ -1894,16 +1950,11 @@
             const centerY = Math.floor(tileCount / 2);
             const headPos = snake[0];
 
-            // A side tile's offset already points straight out along its
-            // own axis - that's its only sensible growth direction. A
-            // corner tile (both x and y nonzero) has two valid axes to
-            // grow along; picked once per candidate here, not re-rolled
-            // every time it's checked below.
-            const directionFor = (o) => {
-                if (o.x === 0) return { x: 0, y: o.y };
-                if (o.y === 0) return { x: o.x, y: 0 };
-                return Math.random() < 0.5 ? { x: o.x, y: 0 } : { x: 0, y: o.y };
-            };
+            // Every candidate is a corner tile, with two valid axes to
+            // grow along (its row's direction or its column's); picked
+            // once per candidate here, not re-rolled every time it's
+            // checked below.
+            const directionFor = (o) => Math.random() < 0.5 ? { x: o.x, y: 0 } : { x: 0, y: o.y };
             const wallFor = (o, dir) => {
                 const wall = [{x: centerX + o.x, y: centerY + o.y}];
                 let x = wall[0].x, y = wall[0].y;

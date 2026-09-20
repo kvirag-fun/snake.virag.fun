@@ -70,12 +70,13 @@ test('each candidate wall is a straight line from its origin, growing away from 
     }
 });
 
-test('the origin is whichever of the 8 candidate tiles sits farthest from the head', async ({ game }) => {
-    // Heads are kept clear of rows/columns 9-11, the only rows/columns any
-    // candidate's wall can ever occupy - otherwise the head itself could
-    // occasionally sit on the "farthest" candidate's own line, correctly
-    // triggering the body-safety filter (tested separately below) and
-    // producing a false mismatch here, which only tests pure distance.
+test('the origin is whichever of the 4 corner tiles sits farthest from the head', async ({ game }) => {
+    // Heads are kept clear of rows/columns 8-11 - a candidate's wall can
+    // only ever occupy row/column 9 or 11 (every candidate is a corner,
+    // never a side tile) - otherwise the head itself could occasionally
+    // sit on the "farthest" candidate's own line, correctly triggering
+    // the body-safety filter (tested separately below) and producing a
+    // false mismatch here, which only tests pure distance.
     const result = await game.evaluate((trials) => {
         const centerX = Math.floor(tileCount / 2);
         const centerY = Math.floor(tileCount / 2);
@@ -109,8 +110,40 @@ test('the origin is whichever of the 8 candidate tiles sits farthest from the he
     expect(result.originsSeen.length).toBeGreaterThan(1);
 });
 
+test('the origin is always one of the 4 corners, never a side tile', async ({ game }) => {
+    // A corner always at least ties its two neighbouring side tiles on
+    // pure distance from any head position (see the big comment on
+    // spawnBasilisk() in index.html), so a random head alone can never
+    // actually exercise a design that still listed side tiles as
+    // candidates - it would keep picking corners anyway, coincidentally.
+    // The only way a side tile could ever legitimately win is the
+    // fallback case this test forces: with the single farthest corner's
+    // wall blocked by the snake's body, the next-best tier under the old
+    // 8-candidate design was a tie between two side tiles (dist 21) -
+    // strictly closer to the head than any remaining corner (dist 20) -
+    // so a regression that quietly widened the candidate pool back to
+    // all 8 would surface here even though a clean board never reveals
+    // it (see the "body avoids the current snake" test above for the
+    // exact same blocking setup, now confirming the *other* thing about
+    // its outcome).
+    const result = await game.evaluate((trials) => {
+        const centerX = Math.floor(tileCount / 2);
+        const centerY = Math.floor(tileCount / 2);
+        const isCorner = (o) => o.x !== centerX && o.y !== centerY;
+        let sideTileSeen = 0;
+
+        for (let i = 0; i < trials; i++) {
+            snake = [{ x: 0, y: 0 }, { x: centerX + 1, y: centerY + 1 }]; // blocks (11,11)
+            spawnBasilisk();
+            if (!isCorner(basiliskWall[0])) sideTileSeen++;
+        }
+        return sideTileSeen;
+    }, TRIALS);
+    expect(result).toBe(0);
+});
+
 test('it never originates on the tile a forgiven death respawns you on', async ({ game }) => {
-    // The origin is one of the 8 tiles *around* centre, never centre
+    // The origin is one of the 4 corners *around* centre, never centre
     // itself - otherwise spending a life while the wall is up would drop
     // you straight onto it.
     const result = await game.evaluate((trials) => {
@@ -364,46 +397,15 @@ test('the first spawn avoids spawning its wall through the current snake body', 
 
     expect(result.collisions).toBe(0);
     expect(result.stillPickedBlocked).toBe(0);
-    // The two next-best tiles are genuinely tied at this distance (see the
-    // fallback-direction test below) - candidates are shuffled before the
-    // distance sort specifically so a tie like this doesn't silently
-    // always resolve to the same one, so both should show up here.
-    expect(new Set(result.originsSeen)).toEqual(new Set(['10,11', '11,10']));
-});
-
-test("a fallback side-tile origin's growth axis is fixed, not a coin flip", async ({ game }) => {
-    // Same forced-fallback setup as the body-safety test above: with the
-    // bottom-right corner blocked, the two remaining side tiles are tied
-    // for next-best and which one wins is randomised (see the shuffle in
-    // spawnBasilisk()) - but unlike the corner coin flip, each side tile
-    // individually has only one valid growth axis (see directionFor() in
-    // index.html), so whichever one wins, *that* origin's direction
-    // should never vary.
-    const result = await game.evaluate((trials) => {
-        const centerX = Math.floor(tileCount / 2);
-        const centerY = Math.floor(tileCount / 2);
-        const dirsByOrigin = new Map();
-        for (let i = 0; i < trials; i++) {
-            snake = [{ x: 0, y: 0 }, { x: centerX + 1, y: centerY + 1 }];
-            spawnBasilisk();
-            const [a, b] = basiliskWall;
-            const originKey = `${a.x},${a.y}`;
-            const dirKey = `${b.x - a.x},${b.y - a.y}`;
-            if (!dirsByOrigin.has(originKey)) dirsByOrigin.set(originKey, new Set());
-            dirsByOrigin.get(originKey).add(dirKey);
-        }
-        return [...dirsByOrigin].map(([origin, dirs]) => [origin, [...dirs]]);
-    }, TRIALS);
-
-    // Both tied side tiles show up (the randomised part)...
-    expect(new Set(result.map(([origin]) => origin))).toEqual(new Set(['10,11', '11,10']));
-    // ...but each one, individually, only ever grew one way (the fixed
-    // part - contrast with the corner coin-flip test above).
-    for (const [, dirs] of result) expect(dirs).toHaveLength(1);
+    // The two next-best corners are genuinely tied at this distance -
+    // candidates are shuffled before the distance sort specifically so a
+    // tie like this doesn't silently always resolve to the same one, so
+    // both should show up here.
+    expect(new Set(result.originsSeen)).toEqual(new Set(['11,9', '9,11']));
 });
 
 test('falls back to an unsafe candidate only when every one collides with the body', async ({ game }) => {
-    // Deliberately adversarial: a segment sitting on every one of the 8
+    // Deliberately adversarial: a segment sitting on every one of the 4
     // origin tiles blocks every candidate's wall (the origin tile is
     // always a wall's first tile, whichever direction it grows in - see
     // wallFor()), so there's no collision-free tile left to offer. This
@@ -491,25 +493,28 @@ test('clearing a stage in real play never respawns the wall at the same tile', a
 });
 
 test("a respawn's body-safety check applies on top of the no-repeat guarantee", async ({ game }) => {
-    // The deterministic next-best tile after excluding the first origin
-    // via the no-repeat guarantee alone (see the test above) is blocked
-    // here with a body segment too, forcing the respawn to skip past it
-    // as well - proving the two filters combine rather than one
-    // overriding the other.
+    // First spawn is the unique farthest corner. Excluding it via the
+    // no-repeat guarantee alone leaves a tie between the other two
+    // second-farthest corners (see the body-safety test above) - blocking
+    // one of those two with a body segment as well forces the respawn
+    // past both filters onto the single remaining corner, proving the two
+    // combine rather than one overriding the other.
     const result = await game.evaluate(() => {
         const centerX = Math.floor(tileCount / 2);
         const centerY = Math.floor(tileCount / 2);
         snake = [{ x: 0, y: 0 }];
         spawnBasilisk();
         const first = { ...basiliskWall[0] };
-        snake = [{ x: 0, y: 0 }, { x: centerX, y: centerY + 1 }]; // blocks the no-repeat fallback tile
+        snake = [{ x: 0, y: 0 }, { x: centerX + 1, y: centerY - 1 }]; // blocks the (11,9) tie candidate
         spawnBasilisk(first);
         return {
             origin: { ...basiliskWall[0] },
             collides: basiliskWall.some((seg) => snake.some((s) => s.x === seg.x && s.y === seg.y)),
         };
     });
-    expect(result.origin).not.toEqual({ x: 10, y: 11 });
+    // Neither the excluded first origin nor the body-blocked tied
+    // candidate - only the third corner survives both filters.
+    expect(result.origin).toEqual({ x: 9, y: 11 });
     expect(result.collides).toBe(false);
 });
 

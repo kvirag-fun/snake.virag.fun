@@ -95,30 +95,36 @@ can earn all three.
   that triggered it get a ♾️ badge next to the score.
 - **Basilisk**: appears the instant you swipe to resume after
   Ouroboros's own pause, gazing a wall out to the board edge. The origin
-  (its head) is whichever of the 8 tiles surrounding the board's center
-  (a 3x3 area minus the middle - see `BASILISK_SPAWN_OFFSETS`/
-  `spawnBasilisk()`) sits farthest, by Manhattan distance, from the
-  snake's head at that moment - not tied to which way you swiped at all,
-  so a later respawn genuinely reconsiders from scratch based on where
-  the snake actually is by then. A side tile (directly above/below/left/
-  right of center) has only one sensible direction to gaze in - straight
-  out along its own axis, away from center; a corner tile has two
-  equally valid choices (its row's direction or its column's), so which
-  one it takes is a coin flip. Either way the wall only ever grows away
-  from center, one step at a time, so it can never fold back through the
-  center tile itself - which is where a forgiven death always respawns -
-  and (since a corner is always at least as far from any head position
-  as its two neighboring side tiles, by exactly one tile - the geometry
-  behind that is in the comment on `spawnBasilisk()`) the origin is in
-  practice always one of the 4 corners, never a side tile, except when
-  the snake's own body has forced a fallback (see below). The origin
-  tile is stone gray with two purple eyes; the rest of the line is the
-  gaze itself, drawn in purple, since that's the part you actually can't
-  enter. Touching any tile of the wall, including its head, is its own death
-  cause - "You gazed into the Basilisk's eyes," with a game-over screen
-  showing the snake turned to stone (same art as the other game-over
-  screens, just recolored gray) - still forgiven by a banked free life
-  (either one), same as any other death.
+  (its head) is always one of the 4 corner tiles of the 3x3 area around
+  the board's center (see `BASILISK_SPAWN_OFFSETS`/`spawnBasilisk()`) -
+  never one of that area's 4 side tiles, which were dropped from the
+  candidate pool entirely rather than merely disfavored. Which corner is
+  whichever sits farthest, by Manhattan distance, from the snake's head
+  at that moment - not tied to which way you swiped at all, so a later
+  respawn genuinely reconsiders from scratch based on where the snake
+  actually is by then. Every corner has two equally valid directions to
+  gaze in (its row's or its column's), so which one it takes is a coin
+  flip; either way the wall only ever grows away from center, one step
+  at a time, so it can never fold back through the center tile itself -
+  which is where a forgiven death always respawns - and never touches a
+  tile orthogonally adjacent to center either, so that respawn always
+  has all 4 directions clear of the wall (bad food can still occupy
+  one, independent of any of this). The origin tile is stone gray with
+  two purple eyes; the rest of the line is the gaze itself, drawn in
+  purple, since that's the part you actually can't enter. Touching any
+  tile of the wall, including its head, is its own death cause - "You
+  gazed into the Basilisk's eyes," with a game-over screen showing the
+  snake turned to stone (same art as the other game-over screens, just
+  recolored gray) - still forgiven by a banked free life (either one),
+  same as any other death.
+
+  All 4 corners are marked as dark, sunken **holes** (`drawCornerHoles()`)
+  the instant Ouroboros fires, for as long as the threat is real - until
+  the Basilisk is actually outgazed - regardless of whether a wall
+  currently happens to be up: a standing warning that any of the 4
+  genuinely could be next, not just the one currently in use. Purely
+  visual - nothing stops the snake walking over a hole, and food can
+  still land on one.
 
   The encounter is **3 sequential stages** totalling
   `BASILISK_TOTAL_FOOD` (20) apples, however they end up split - each
@@ -140,9 +146,9 @@ can earn all three.
   step at a time - first allowing a repeat, then dropping body-safety
   too - since a wall has to go somewhere even if every candidate
   currently collides; avoiding the snake takes priority over the
-  no-repeat guarantee, and this is also the one way a side tile can end
-  up as the origin despite corners always outranking them on raw
-  distance. Only clearing the third stage is the
+  no-repeat guarantee - but the fallback never reaches outside the 4
+  corners themselves, since there's nothing else left in the candidate
+  pool to fall back to. Only clearing the third stage is the
   achievement: same pause/rays treatment as Ouroboros, right down to
   collapsing to a single tile and regrowing back out one tile per move
   once play resumes (`regrowPending`), and banking its own **free
@@ -227,16 +233,16 @@ Rules that hold across every state:
 - **Each egg fires exactly once**, and each later one needs the previous:
   no Basilisk without Ouroboros, no Jörmungandr without the Basilisk.
 
-Known behavior worth expecting: since the origin is in practice always
-one of the 4 corner tiles (see above), and a corner's wall - whichever
-axis it grows along - never touches a tile orthogonally adjacent to
-center, spending a life while the Basilisk is up and respawning at
-center leaves all four directions safe in ordinary play. The one
-exception is the fallback path: if the snake's own body has forced the
-origin onto a side tile instead, that tile *is* orthogonally adjacent to
-center, so three of your four directions are still safe and the run
-pauses for you to pick one, but swiping into the wall from the respawn
-is an instant second death.
+Known behavior worth expecting: since the origin is always one of the 4
+corner tiles (see above), and a corner's wall - whichever axis it grows
+along - never touches a tile orthogonally adjacent to center, spending a
+life while the Basilisk is up and respawning at center always leaves all
+four directions clear of the wall itself. The one thing that can still
+narrow that down is bad food, which is placed independently and isn't
+excluded from landing on a tile adjacent to center - the run still
+pauses for you to pick a direction, but swiping into a bad food tile
+from the respawn is an instant second death, same as it would be
+anywhere else on the board.
 
 ## Running locally
 
