@@ -296,6 +296,7 @@ and connects to the emulator instead of production.
 | `firebase.json`, `.firebaserc` | Local emulator config for `firestore.rules` |
 | `vite.config.js` | Build config, including the `vite-plugin-pwa` manifest/icon setup |
 | `playwright.config.js`, `tests/` | End-to-end test config and specs (see above) |
+| `art-src/` | Pre-resize 1024x1024 originals of the `public/` art, kept for future re-exports - not built or deployed |
 | `public/CNAME` | Custom domain for GitHub Pages |
 | `public/tab_icon.ico` | Favicon (no-gap pixel-art render, no eye detail - aliases into noise at 16-32px otherwise) |
 | `public/icon-192.png`, `public/icon-512.png`, `public/apple-touch-icon.png` | PWA/home-screen icons (segmented pixel-art render, with head/eye detail) |
@@ -311,4 +312,9 @@ because 1.6MB of art, four images of it not yet visible, was being
 fetched before anything could render. At 400x400, with the game-over
 art deferred until the splash has landed, the same test shows the
 splash in **6s**. Don't re-export them larger.
+
+The pre-resize 1024x1024 originals are kept in `art-src/` (not built or
+deployed - Vite only serves `public/`) in case the canvas ever grows
+past 400x400 and the art needs re-exporting at a larger size, so no one
+has to go digging through git history for them.
 | `public/food.mp3`, `public/ugh_05s.mp3` | Sound effects (eating food, game over) |
