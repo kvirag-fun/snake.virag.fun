@@ -2264,7 +2264,18 @@
         let touchStartX = 0;
         let touchStartY = 0;
         let touchIsOnControl = false;
-        const minSwipeDistance = 20;
+        // A finger's contact position can jump a little right as it lifts
+        // off the screen - confirmed directly: a swipe that resolves
+        // cleanly, then gets one last touchmove 25px+ off-axis right
+        // before touchend, registers as a second, unintended turn (see
+        // the touchmove listener below - this is the "kink at the end of
+        // a swipe" complaint). That's not fixable by waiting for
+        // touchend - the design deliberately resolves mid-swipe instead,
+        // see the comment above the touchmove listener - so 20 was raised
+        // to 28: still comfortably below every genuine swipe distance
+        // this game expects, but past the range where lift-off jitter
+        // alone was crossing it.
+        const minSwipeDistance = 28;
 
         function isFormControl(target) {
             return target.closest('select, input, label, #infoOverlay, #infoButton, #nicknameOverlay') !== null;

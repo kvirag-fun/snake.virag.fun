@@ -159,3 +159,27 @@ test('a near-diagonal drag resolves to one direction, not a right/down staircase
     const distinctDirs = new Set(queued.map(q => `${q.dx},${q.dy}`));
     expect(distinctDirs.size).toBeLessThanOrEqual(1);
 });
+
+test('a small kink right at the end of a swipe, just before lift-off, does not queue a second turn', async ({ game }) => {
+    // A finger's contact position can jump a little as it lifts off the
+    // screen. Confirmed directly: with the swipe threshold at its
+    // original 20px, a clean swipe followed by one last touchmove as
+    // little as ~24px off-axis, right before touchend, queued a second,
+    // unintended turn. Raising the threshold to 28px doesn't eliminate
+    // this entirely - a large enough final movement is genuinely
+    // indistinguishable from a deliberate new swipe, see the comment
+    // above minSwipeDistance in index.html - but it does close off the
+    // smaller, more common end of that range.
+    await setUpSnake(game);
+    await game.evaluate(() => { dx = 0; dy = -1; });  // heading up, so rightward is a genuine turn and downward is safely non-reversal
+    const touch = await cdpTouch(game);
+    const { x, y } = await boardOrigin(game);
+
+    await touch.down(x, y);
+    await touch.move(x + 72, y);       // a clean rightward swipe, well past the threshold
+    await touch.move(x + 72, y + 24);  // a modest 24px kink downward, right before lift-off
+    await touch.up();
+
+    const queued = await game.evaluate(() => window.__queued);
+    expect(queued).toEqual([{ dx: 1, dy: 0 }]);
+});

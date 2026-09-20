@@ -281,7 +281,7 @@ silent no-op until it's dismissed.
 | `chain.spec.js` | Egg gating, both free lives, full-run score arithmetic, restart, leaderboard badges |
 | `regrow.spec.js` | The no-apple-while-regrowing rule, on all four collapse paths |
 | `gates.spec.js` | The shared announcement overlay/gate - all four triggers, the badge emoji, golden rays on a life saved - driven through real touch and key events |
-| `swipe.spec.js` | The touch swipe-to-direction resolution itself - blocked reversals, chaining multiple turns in one continuous drag, redundant same-direction crossings not spamming the queue, a diagonal drag not spuriously firing the axis it never meant to turn on, and a near-diagonal drag not staircasing between the two - driven through raw CDP touch events (`Input.dispatchTouchEvent`), not just poking `inputQueue` |
+| `swipe.spec.js` | The touch swipe-to-direction resolution itself - blocked reversals, chaining multiple turns in one continuous drag, redundant same-direction crossings not spamming the queue, a diagonal drag not spuriously firing the axis it never meant to turn on, a near-diagonal drag not staircasing between the two, and a small kink right before lift-off not queuing a spurious second turn - driven through raw CDP touch events (`Input.dispatchTouchEvent`), not just poking `inputQueue` |
 
 The suite runs in CI as a gate on the deploy (see below), so a push that
 breaks the chain fails before it reaches Pages.
