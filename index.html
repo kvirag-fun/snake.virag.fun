@@ -647,7 +647,7 @@
 
             <div class="panel-title">Controls</div>
             <ul class="info-list">
-                <li>Arrow keys or swipe to steer.</li>
+                <li>Arrow keys, numpad 8/4/5/6, or swipe to steer.</li>
                 <li>A swipe can start anywhere on the page, not just on the canvas.</li>
                 <li>Double-tap the canvas or press <strong>R</strong> to restart after a game over.</li>
                 <li>Double-tap or <strong>R</strong> also resumes play after an announcement, or after a free life saves you - always, on every device. Steering alone never resumes it, so a stray swipe or keypress can't set you moving again by itself.</li>
@@ -2217,7 +2217,25 @@
         // Handle keyboard input
         document.addEventListener('keydown', (e) => {
             const LEFT = 37, UP = 38, RIGHT = 39, DOWN = 40, R = 82;
-        
+            // Numpad 8/4/5/6 as an alternate direction cluster - requested
+            // for keyboards where the arrow cluster splits Up/Down away
+            // from Left/Right, making them awkward to reach together. 5
+            // (not 2) is Down here, since it sits in the same tight
+            // diamond as 8/4/6 - the whole point is one hand covering all
+            // four without moving.
+            //
+            // 8/4/6 need no extra handling at all: with Num Lock off (the
+            // common case, and what a browser sends by default) those keys
+            // already report the standard ArrowUp/Left/Right keyCodes
+            // above; with Num Lock on they report 104/100/102, added here.
+            // 5 is the odd one out either way - confirmed directly (not
+            // assumed): with Num Lock on it's keyCode 101, but off it has
+            // no arrow-key equivalent at all and reports 12 ("Clear"/
+            // Begin) instead, so both need covering for 5 to work as Down
+            // regardless of Num Lock state.
+            const NUM_UP = 104, NUM_LEFT = 100, NUM_RIGHT = 102;
+            const NUM_DOWN = 101, NUM_DOWN_NUMLOCK_OFF = 12;
+
             // R key ONLY restarts when game over - but not while typing a
             // nickname (or anything else) into a text input, where an "r"
             // keystroke should just be an "r" keystroke.
@@ -2246,10 +2264,10 @@
             // Decide what the "current" direction is for validation
             const lastDir = inputQueue.length > 0 ? inputQueue.at(-1) : { dx, dy };
 
-            if (e.keyCode === LEFT  && lastDir.dx !== 1  && lastDir.dx !== -1)  { inputQueue.push({ dx: -1, dy: 0}); console.log("LEFT"); }
-            if (e.keyCode === UP    && lastDir.dy !== 1  && lastDir.dy !== -1)  { inputQueue.push({dx: 0, dy: -1}); console.log("UP"); }
-            if (e.keyCode === RIGHT && lastDir.dx !== -1 && lastDir.dx !== 1)   { inputQueue.push({dx: 1, dy: 0}); console.log("RIGHT"); }
-            if (e.keyCode === DOWN  && lastDir.dy !== -1 && lastDir.dy !== 1)   { inputQueue.push({dx: 0, dy: 1}); console.log("DOWN"); }
+            if ((e.keyCode === LEFT  || e.keyCode === NUM_LEFT)  && lastDir.dx !== 1  && lastDir.dx !== -1)  { inputQueue.push({ dx: -1, dy: 0}); console.log("LEFT"); }
+            if ((e.keyCode === UP    || e.keyCode === NUM_UP)    && lastDir.dy !== 1  && lastDir.dy !== -1)  { inputQueue.push({dx: 0, dy: -1}); console.log("UP"); }
+            if ((e.keyCode === RIGHT || e.keyCode === NUM_RIGHT) && lastDir.dx !== -1 && lastDir.dx !== 1)   { inputQueue.push({dx: 1, dy: 0}); console.log("RIGHT"); }
+            if ((e.keyCode === DOWN  || e.keyCode === NUM_DOWN || e.keyCode === NUM_DOWN_NUMLOCK_OFF) && lastDir.dy !== -1 && lastDir.dy !== 1)   { inputQueue.push({dx: 0, dy: 1}); console.log("DOWN"); }
         });
 
         // Handle touch screen input - bound to the whole document, not just

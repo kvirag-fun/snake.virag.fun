@@ -7,10 +7,12 @@ installable as a PWA. Live at
 
 ## Features
 
-- **Arrow keys or swipe** to steer — both go through the same input
-  queue, so turns always resolve in the order they happened, and swipes
-  register the instant you've moved your finger far enough (not after
-  you lift it).
+- **Arrow keys, numpad 8/4/5/6, or swipe** to steer — all go through the
+  same input queue, so turns always resolve in the order they happened,
+  and swipes register the instant you've moved your finger far enough
+  (not after you lift it). The numpad cluster is for keyboards where the
+  arrow keys split Up/Down away from Left/Right; 5 is Down rather than 2
+  so all four directions sit in one reachable diamond around 8/4/6.
 - **Four difficulty levels** (Viper, Python, Anaconda, King Cobra), each
   with its own **global top-5 leaderboard** shared across everyone who
   plays, backed by Firestore. Making the top 5 prompts for an optional
@@ -282,6 +284,7 @@ silent no-op until it's dismissed.
 | `regrow.spec.js` | The no-apple-while-regrowing rule, on all four collapse paths |
 | `gates.spec.js` | The shared announcement overlay/gate - all four triggers, the badge emoji, golden rays on a life saved - driven through real touch and key events |
 | `swipe.spec.js` | The touch swipe-to-direction resolution itself - blocked reversals, chaining multiple turns in one continuous drag, redundant same-direction crossings not spamming the queue, a diagonal drag not spuriously firing the axis it never meant to turn on, a near-diagonal drag not staircasing between the two, and a small kink right before lift-off not queuing a spurious second turn - driven through raw CDP touch events (`Input.dispatchTouchEvent`), not just poking `inputQueue` |
+| `keyboard.spec.js` | The numpad 8/4/5/6 alternate direction cluster - each key chaining the same as its arrow-key equivalent, and 5 blocked as a reversal exactly like ArrowDown - driven through real key presses |
 
 The suite runs in CI as a gate on the deploy (see below), so a push that
 breaks the chain fails before it reaches Pages.
