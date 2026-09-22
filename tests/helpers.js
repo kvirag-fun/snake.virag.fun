@@ -85,6 +85,21 @@ function installHelpers() {
         // tick, wrapping back leftwards before the right wall. Tolerates
         // both the regrow stretch (where no apple can be eaten at all)
         // and any overlay that opens mid-run.
+        //
+        // A Basilisk gaze wall - now that walls accumulate rather than
+        // replace one another (up to 4 live at once by the last stage) -
+        // can sit directly in the path of a straight rightward sweep
+        // often enough to matter, and unlike a single wall this can't
+        // just be waited out: the same blocked tile is still there next
+        // tick. Rightward is still preferred (simplest, and what every
+        // caller's own row math assumes), but a wall or the board edge
+        // one step ahead now steps around it - down, then up, then left -
+        // rather than walking into it every single tick. Keeping a life
+        // banked throughout is still worth doing on top of that: even
+        // with routing, an accidental gaze/self death (the snake's own
+        // body is not otherwise avoided when picking a direction) should
+        // be forgiven rather than ending the run early and silently
+        // leaving the sweep short of `n`.
         eatApples(n) {
             let eaten = 0;
             let guard = 0;
@@ -93,10 +108,20 @@ function installHelpers() {
                     this.dismissAndResume(1, 0);
                     continue;
                 }
+                if (!ouroborosLifeAvailable && !basiliskLifeAvailable) {
+                    ouroborosLifeAvailable = true;
+                }
                 const head = snake[0];
-                food = { x: head.x + 1, y: head.y };
-                dx = 1;
-                dy = 0;
+                const isWall = (x, y) => basiliskActive
+                    && basiliskWalls.some((wall) => wall.some((s) => s.x === x && s.y === y));
+                const candidates = [{ x: 1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }, { x: -1, y: 0 }];
+                const step = candidates.find(({ x: sx, y: sy }) => {
+                    const tx = head.x + sx, ty = head.y + sy;
+                    return tx >= 0 && tx < tileCount && ty >= 0 && ty < tileCount && !isWall(tx, ty);
+                }) || candidates[0];
+                food = { x: head.x + step.x, y: head.y + step.y };
+                dx = step.x;
+                dy = step.y;
                 const before = score;
                 this.step();
                 if (score > before) eaten++;
@@ -192,8 +217,13 @@ function installHelpers() {
                 basiliskTriggered,
                 jormungandrTriggered,
                 basiliskActive,
-                basiliskWallLength: basiliskWall.length,
-                basiliskWall: basiliskWall.map((s) => ({ x: s.x, y: s.y })),
+                // Every wall spawned so far this encounter (oldest first -
+                // see basiliskWalls in index.html), not just the latest;
+                // walls accumulate rather than replace one another.
+                basiliskWallCount: basiliskWalls.length,
+                basiliskWallLength: basiliskWalls.reduce((sum, w) => sum + w.length, 0),
+                basiliskWalls: basiliskWalls.map((w) => w.map((s) => ({ x: s.x, y: s.y }))),
+                basiliskHoles: basiliskHoles.map((h) => ({ ...h })),
                 basiliskFoodCounter,
                 basiliskStage,
                 basiliskStageQuotas: [...basiliskStageQuotas],

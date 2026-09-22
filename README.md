@@ -103,62 +103,65 @@ can earn all three.
   after both lives are spent, is a normal death. Leaderboard entries
   that triggered it get a ♾️ badge next to the score.
 - **Basilisk**: appears the instant you swipe to resume after
-  Ouroboros's own pause, gazing a wall out to the board edge. The origin
-  (its head) is always one of the 4 corner tiles of the 3x3 area around
-  the board's center (see `BASILISK_SPAWN_OFFSETS`/`spawnBasilisk()`) -
-  never one of that area's 4 side tiles, which were dropped from the
-  candidate pool entirely rather than merely disfavored. Which corner is
-  whichever sits farthest, by Manhattan distance, from the snake's head
-  at that moment - not tied to which way you swiped at all, so a later
-  respawn genuinely reconsiders from scratch based on where the snake
-  actually is by then. Every corner has two equally valid directions to
-  gaze in (its row's or its column's), so which one it takes is a coin
-  flip; either way the wall only ever grows away from center, one step
-  at a time, so it can never fold back through the center tile itself -
-  which is where a forgiven death always respawns - and never touches a
-  tile orthogonally adjacent to center either, so that respawn always
-  has all 4 directions clear of the wall (bad food can still occupy
-  one, independent of any of this). The origin tile is stone gray with
-  two purple eyes; the rest of the line is the gaze itself, drawn in
-  purple, since that's the part you actually can't enter. Touching any
-  tile of the wall, including its head, is its own death cause - "You
-  gazed into the Basilisk's eyes," with a game-over screen showing the
-  snake turned to stone (same art as the other game-over screens, just
-  recolored gray) - still forgiven by a banked free life (either one),
-  same as any other death.
+  Ouroboros's own pause, gazing a wall out to the board edge. This run's
+  4 possible origins ("holes") are chosen once, uniformly at random from
+  the whole board, excluding both the outer 3 rings (a wall there would
+  have almost no reach - over before it's a real threat) and the center
+  7x7 square (`BASILISK_EDGE_MARGIN`/`BASILISK_CENTER_HALF`/
+  `randomBasiliskHoles()`) - every other tile is fair game, not just the
+  4 corners next to center the way earlier versions of this worked. Each
+  of the 4 holes is used exactly once, ever, across the whole encounter:
+  whichever of the *not-yet-used* holes sits farthest, by Manhattan
+  distance, from the snake's head at that moment is picked for the next
+  stage - not tied to which way you swiped at all, so each new wall
+  genuinely reconsiders from scratch based on where the snake actually
+  is by then. A hole has two equally valid directions to gaze in (its
+  row's or its column's), so which one it takes is a coin flip - unless
+  it sits exactly on the board's center row or column, where only one of
+  those two directions actually points away from center, and that one is
+  forced. Either way the wall only ever grows away from center, one step
+  at a time, so it can never fold back through the center tile itself,
+  or a tile orthogonally adjacent to it - which is where a forgiven
+  death always respawns, so that respawn always has all 4 directions
+  clear of every wall (bad food can still occupy one, independent of any
+  of this). Each wall's origin tile is stone gray with two purple eyes;
+  the rest of its line is the gaze itself, drawn in purple, since that's
+  the part you actually can't enter. Touching any tile of any wall,
+  including a head, is its own death cause - "You gazed into the
+  Basilisk's eyes," with a game-over screen showing the snake turned to
+  stone (same art as the other game-over screens, just recolored gray) -
+  still forgiven by a banked free life (either one), same as any other
+  death.
 
-  All 4 corners are marked as dark, sunken **holes** (`drawCornerHoles()`)
-  the instant Ouroboros fires, for as long as the threat is real - until
-  the Basilisk is actually outgazed - regardless of whether a wall
-  currently happens to be up: a standing warning that any of the 4
-  genuinely could be next, not just the one currently in use. Purely
-  visual - nothing stops the snake walking over a hole, and food can
-  still land on one.
+  All 4 holes are marked as dark, sunken pits (`drawCornerHoles()`) the
+  instant Ouroboros fires, for as long as the threat is real - until the
+  Basilisk is actually outgazed - regardless of how many of them have a
+  wall up yet: a standing warning that any of the 4 genuinely could be
+  next. Purely visual - nothing stops the snake walking over a hole, and
+  food can still land on one.
 
   The encounter is **4 sequential stages** totalling
   `BASILISK_TOTAL_FOOD` (25) apples, however they end up split - each
   stage needs at least `BASILISK_STAGE_MIN` (5), the remaining "slack"
   handed out randomly per run (`randomBasiliskStageQuotas()`), so the
-  total is always exactly 20 but where the wall resets along the way
+  total is always exactly 25 but where each wall lands along the way
   isn't. Not raw moves - circling in place can't clear a stage for
-  free, you have to actually keep eating. Clearing stage 1 or 2 doesn't
-  pause anything; the wall just respawns and the apple count for that
-  stage starts over at 0. Every spawn, first or respawn alike, first
-  filters out any candidate whose wall would land directly on the
-  current snake body - checked against the whole body, not just its
-  head, since by a later stage the snake is no longer freshly collapsed
-  and short the way it is on the very first spawn, and may have grown
-  enough to genuinely pass near center, where every candidate
-  originates. A respawn additionally excludes the tile it just vacated,
-  so "respawns" always mean somewhere new, not a legitimate recomputation
-  back onto the same farthest tile as before. Both filters fall back a
-  step at a time - first allowing a repeat, then dropping body-safety
-  too - since a wall has to go somewhere even if every candidate
-  currently collides; avoiding the snake takes priority over the
-  no-repeat guarantee - but the fallback never reaches outside the 4
-  corners themselves, since there's nothing else left in the candidate
-  pool to fall back to. Only clearing the third stage is the
-  achievement: same pause/rays treatment as Ouroboros, right down to
+  free, you have to actually keep eating. Clearing a stage doesn't
+  replace the wall - it ADDS the next one on top of whatever's already
+  up, so by the fourth stage all 4 are live hazards simultaneously, and
+  the apple count for the new stage starts over at 0. Every spawn - the
+  first or any later one - first filters candidates (this stage's unused
+  holes) down to whichever wouldn't land directly on the current snake
+  body - checked against the whole body, not just the head, since by a
+  later stage the snake is no longer freshly collapsed and short the way
+  it is on the very first spawn. That filter falls back to ignoring body
+  safety only if it would otherwise leave nothing to offer - a wall has
+  to go somewhere even if every remaining hole currently collides -
+  since avoiding the snake takes priority, but a used hole never
+  reappears as a candidate regardless: uniqueness here isn't a separate
+  guarantee that can fall back, it falls straight out of the candidate
+  pool shrinking by one every stage. Only clearing the fourth stage is
+  the achievement: same pause/rays treatment as Ouroboros, right down to
   collapsing to a single tile and regrowing back out one tile per move
   once play resumes (`regrowPending`), and banking its own **free
   life** - the second heart next to the score,
@@ -213,7 +216,7 @@ Rules that hold across every state:
   that order, whatever killed you (wall, self, rotten, gaze).
 - **A forgiven death never resets progress.** It respawns you at the
   board's center at length 1 and regrows you to your pre-death length;
-  the Basilisk's wall and its apple counter both survive it.
+  the Basilisk's walls and its apple counter all survive it.
 - **Every pause resumes the same way: double-tap or `R`, always.** All
   four announcements - an egg discovery or a life saved by one, see
   `beginSpecialEvent()` - are one overlay, one gate
@@ -242,16 +245,17 @@ Rules that hold across every state:
 - **Each egg fires exactly once**, and each later one needs the previous:
   no Basilisk without Ouroboros, no Jörmungandr without the Basilisk.
 
-Known behavior worth expecting: since the origin is always one of the 4
-corner tiles (see above), and a corner's wall - whichever axis it grows
-along - never touches a tile orthogonally adjacent to center, spending a
-life while the Basilisk is up and respawning at center always leaves all
-four directions clear of the wall itself. The one thing that can still
-narrow that down is bad food, which is placed independently and isn't
-excluded from landing on a tile adjacent to center - the run still
-pauses for you to pick a direction, but swiping into a bad food tile
-from the respawn is an instant second death, same as it would be
-anywhere else on the board.
+Known behavior worth expecting: since every hole is already excluded
+from the center square (see above), and a wall - whichever axis it
+grows along - only ever moves farther from center, never closer, no
+wall can ever touch a tile orthogonally adjacent to center either.
+Spending a life while the Basilisk is up and respawning at center
+always leaves all four directions clear of every wall. The one thing
+that can still narrow that down is bad food, which is placed
+independently and isn't excluded from landing on a tile adjacent to
+center - the run still pauses for you to pick a direction, but swiping
+into a bad food tile from the respawn is an instant second death, same
+as it would be anywhere else on the board.
 
 ## Running locally
 
@@ -286,7 +290,7 @@ silent no-op until it's dismissed.
 | --- | --- |
 | `deaths.spec.js` | The four death causes and their message/image tables |
 | `ouroboros.spec.js` | The scaled bonus curve, the collapse, the free life, once-per-run, and the tail's gold frame at max-bonus length (on/off, and off again once actually triggered) |
-| `basilisk.spec.js` | Spawn geometry (sampled over repeated runs), the gaze death, the apple counter, the 4-stage split and its randomisation, outgazing |
+| `basilisk.spec.js` | Spawn geometry (sampled over repeated runs) - random hole placement and its exclusion zones, walls accumulating rather than replacing, each of the 4 holes used exactly once - plus the gaze death, the apple counter, the 4-stage split and its randomisation, outgazing |
 | `chain.spec.js` | Egg gating, both free lives, full-run score arithmetic, restart, leaderboard badges |
 | `regrow.spec.js` | The no-apple-while-regrowing rule, on all four collapse paths |
 | `gates.spec.js` | The shared announcement overlay/gate - all four triggers, the badge emoji, golden rays on a life saved - driven through real touch and key events |

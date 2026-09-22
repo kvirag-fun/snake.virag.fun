@@ -30,8 +30,8 @@ test('Jörmungandr stays locked while the Basilisk is unbeaten', async ({ game }
         const h = window.__game;
         h.fireOuroboros();
         h.dismissAndResume(1, 0);          // Basilisk now active
-        basiliskActive = false;            // clear the wall out of the way,
-        basiliskWall = [];                 // but leave it *unbeaten*
+        basiliskActive = false;            // clear the walls out of the way,
+        basiliskWalls = [];                // but leave it *unbeaten*
         h.stack(length + 10, 3, 12);
         food = { x: 4, y: 12 };
         dx = 1;

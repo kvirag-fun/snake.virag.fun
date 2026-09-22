@@ -974,20 +974,30 @@
 
         // Basilisk easter egg - see spawnBasilisk()/triggerBasiliskSurvived()
         // below for the full mechanism. The encounter is 4 sequential
-        // stages (a new wall - new origin, recomputed from scratch against
-        // wherever the snake currently is - each time one clears)
-        // totalling BASILISK_TOTAL_FOOD apples, however they end up
-        // split: randomised per run at the first spawn, each stage
-        // getting at least BASILISK_STAGE_MIN, see
+        // stages (a new wall - new origin, one of the 4 holes chosen for
+        // this run, picked fresh against wherever the snake currently is -
+        // ADDED each time a stage clears, the previous ones staying up
+        // rather than being replaced) totalling BASILISK_TOTAL_FOOD
+        // apples, however they end up split: randomised per run at the
+        // first spawn, each stage getting at least BASILISK_STAGE_MIN, see
         // randomBasiliskStageQuotas(). The total is fixed regardless of
         // the split, so outgazing it always takes exactly 25 apples -
-        // only where the wall resets along the way is unpredictable.
+        // only where the walls land along the way is unpredictable.
         const BASILISK_TOTAL_FOOD = 25;
         const BASILISK_STAGE_COUNT = 4;
         const BASILISK_STAGE_MIN = 5;
         let basiliskTriggered = false;
         let basiliskActive = false;
-        let basiliskWall = [];
+        // One array of tiles per stage spawned so far, oldest first -
+        // see spawnBasilisk(). All of them are live hazards at once; only
+        // triggerBasiliskSurvived() ever clears the whole thing out.
+        let basiliskWalls = [];
+        // The 4 hole positions for this run, chosen once (see
+        // randomBasiliskHoles()) the moment the encounter starts - each
+        // one becomes exactly one stage's wall origin, in whatever order
+        // spawnBasilisk() picks them (farthest-from-head first, among
+        // whichever haven't been used yet).
+        let basiliskHoles = [];
         let basiliskFoodCounter = 0;
         // Which of the BASILISK_STAGE_COUNT stages is current (1-indexed;
         // 0 when no Basilisk encounter is underway) and how many apples
@@ -1240,8 +1250,8 @@
                 // Check collision with BAD FOOD
                 const collidesWithBadFood = badFoodList.some(badFood => badFood.x === food.x && badFood.y === food.y);
 
-                // Check collision with the Basilisk's gaze wall, if up
-                const collidesWithBasiliskWall = basiliskActive && basiliskWall.some(seg => seg.x === food.x && seg.y === food.y);
+                // Check collision with the Basilisk's gaze walls, if any are up
+                const collidesWithBasiliskWall = basiliskActive && basiliskWalls.some(wall => wall.some(seg => seg.x === food.x && seg.y === food.y));
 
                 validPosition = !collidesWithSnake && !collidesWithBadFood && !collidesWithBasiliskWall;
             }
@@ -1275,8 +1285,8 @@
                     // Check collision with BAD FOOD
                     const badFoodCollision = badFoodList.some(badFood => badFood.x === newBadFood.x && badFood.y === newBadFood.y);
 
-                    // Check collision with the Basilisk's gaze wall, if up
-                    const basiliskWallCollision = basiliskActive && basiliskWall.some(seg => seg.x === newBadFood.x && seg.y === newBadFood.y);
+                    // Check collision with the Basilisk's gaze walls, if any are up
+                    const basiliskWallCollision = basiliskActive && basiliskWalls.some(wall => wall.some(seg => seg.x === newBadFood.x && seg.y === newBadFood.y));
 
                     validPosition = !snakeCollision && !badFoodCollision && !regularFoodCollision && !tooCloseToHead && !basiliskWallCollision;
                 }
@@ -1375,31 +1385,29 @@
             ctx.restore();
         }
 
-        // The Basilisk's 4 possible spawn points (see BASILISK_SPAWN_OFFSETS/
-        // spawnBasilisk()) - marked as dark, sunken holes for as long as
-        // the threat is real: from the instant Ouroboros fires
-        // (ouroborosTriggered) until the Basilisk is actually outgazed
-        // (basiliskTriggered), regardless of whether a wall currently
-        // happens to be up. Purely a warning, not a hazard of its own -
-        // nothing stops the snake walking over one, and food can still
-        // land there. A radial gradient (near-black center, dark gray
-        // rim) reads as depth rather than a flat fill; a light stroke on
-        // the upper-left edge and a dark one on the lower-right fake the
-        // inset-shadow look of an actual pit, the same trick a raised UI
-        // panel uses in reverse.
+        // The Basilisk's 4 hole positions for this run (see
+        // randomBasiliskHoles()/spawnBasilisk()) - marked as dark, sunken
+        // holes for as long as the threat is real: from the instant
+        // Ouroboros fires (ouroborosTriggered) until the Basilisk is
+        // actually outgazed (basiliskTriggered), regardless of how many
+        // of them have a wall up yet. Purely a warning, not a hazard of
+        // its own - nothing stops the snake walking over one, and food
+        // can still land there. A radial gradient (near-black center,
+        // dark gray rim) reads as depth rather than a flat fill; a light
+        // stroke on the upper-left edge and a dark one on the
+        // lower-right fake the inset-shadow look of an actual pit, the
+        // same trick a raised UI panel uses in reverse.
         function drawCornerHoles() {
-            const centerX = Math.floor(tileCount / 2);
-            const centerY = Math.floor(tileCount / 2);
-            for (const o of BASILISK_SPAWN_OFFSETS) {
-                const px = (centerX + o.x) * gridSize;
-                const py = (centerY + o.y) * gridSize;
+            for (const hole of basiliskHoles) {
+                const px = hole.x * gridSize;
+                const py = hole.y * gridSize;
                 const cx = px + gridSize / 2;
                 const cy = py + gridSize / 2;
 
-                const hole = ctx.createRadialGradient(cx, cy, 0, cx, cy, gridSize / 2);
-                hole.addColorStop(0, '#000000');
-                hole.addColorStop(1, '#242424');
-                ctx.fillStyle = hole;
+                const holeGradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, gridSize / 2);
+                holeGradient.addColorStop(0, '#000000');
+                holeGradient.addColorStop(1, '#242424');
+                ctx.fillStyle = holeGradient;
                 ctx.fillRect(px, py, gridSize, gridSize);
 
                 ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
@@ -1454,12 +1462,14 @@
                 drawSpecialRays(specialEventKind);
             }
 
-            // Basilisk's gaze wall, under the food/snake layers below - the
-            // origin tile is its stone-gray head (with two purple eyes),
-            // the rest of the line is the gaze itself, in purple - the
-            // part you actually can't enter.
+            // Basilisk's gaze walls, under the food/snake layers below -
+            // every wall spawned so far this encounter, not just the
+            // latest (see basiliskWalls) - each one's origin tile is its
+            // own stone-gray head (with two purple eyes), the rest of its
+            // line is the gaze itself, in purple - the part you actually
+            // can't enter.
             if (basiliskActive) {
-                basiliskWall.forEach((seg, i) => {
+                basiliskWalls.forEach((wall) => wall.forEach((seg, i) => {
                     const px = seg.x * gridSize;
                     const py = seg.y * gridSize;
                     if (i === 0) {
@@ -1481,7 +1491,7 @@
                         ctx.lineWidth = 1;
                         ctx.strokeRect(px + 0.5, py + 0.5, gridSize - 1, gridSize - 1);
                     }
-                });
+                }));
             }
 
             // Draw food with stem - hidden entirely while the snake is
@@ -1640,6 +1650,7 @@
                 specialEventWaiting = false;
                 specialEventKind = null;
                 if (resumedKind === 'ouroboros' && !basiliskTriggered && !basiliskActive) {
+                    basiliskHoles = randomBasiliskHoles();
                     basiliskStage = 1;
                     basiliskStageQuotas = randomBasiliskStageQuotas();
                     spawnBasilisk();
@@ -1654,15 +1665,18 @@
                 return;
             }
 
-            // Check the Basilisk's gaze wall, if one is currently up - its
-            // own death cause (forgiven by a banked Ouroboros life the
+            // Check the Basilisk's gaze walls, if any are currently up -
+            // its own death cause (forgiven by a banked Ouroboros life the
             // same as any other death), not lumped in with the board's
-            // own edge.
+            // own edge. Every wall spawned so far this encounter is a live
+            // hazard, not just the latest.
             if (basiliskActive) {
-                for (const seg of basiliskWall) {
-                    if (head.x === seg.x && head.y === seg.y) {
-                        handleDeath('gaze');
-                        return;
+                for (const wall of basiliskWalls) {
+                    for (const seg of wall) {
+                        if (head.x === seg.x && head.y === seg.y) {
+                            handleDeath('gaze');
+                            return;
+                        }
                     }
                 }
             }
@@ -1741,18 +1755,19 @@
             }
 
             // Basilisk: surviving until the current stage's quota of
-            // apples have been eaten since its wall last (re)spawned is
-            // the achievement - the wall itself doesn't reward anything,
-            // only outlasting it does. Before the last stage, "surviving"
-            // just moves the wall (recomputed from scratch against
-            // wherever the snake is now - see spawnBasilisk() - never the
-            // tile it's replacing) rather than ending the encounter.
-            // Checked before Jörmungandr below, since Jörmungandr now
-            // requires the whole encounter to have already finished.
+            // apples have been eaten since its latest wall spawned is the
+            // achievement - the wall itself doesn't reward anything, only
+            // outlasting it does. Before the last stage, "surviving" adds
+            // one more wall (a fresh origin, picked from wherever the
+            // snake is now - see spawnBasilisk() - among this run's holes
+            // that haven't been used yet) on top of the ones already up,
+            // rather than ending the encounter. Checked before Jörmungandr
+            // below, since Jörmungandr now requires the whole encounter to
+            // have already finished.
             if (!specialEventWaiting && basiliskActive && basiliskFoodCounter >= basiliskStageQuotas[basiliskStage - 1]) {
                 if (basiliskStage < BASILISK_STAGE_COUNT) {
                     basiliskStage++;
-                    spawnBasilisk(basiliskWall[0]);
+                    spawnBasilisk();
                 } else {
                     triggerBasiliskSurvived();
                 }
@@ -1903,14 +1918,44 @@
             beginSpecialEvent('jormungandr', 'Jörmungandr Found!', '+1000');
         }
 
-        // The 4 corner tiles of the 3x3 area around the board's center -
-        // the Basilisk's only possible spawn points (see spawnBasilisk()
-        // below); never the 4 side tiles of that same area. Marked with a
-        // dark "hole" the instant Ouroboros unlocks the threat, long
-        // before any wall actually appears there (see drawCornerHoles()).
-        const BASILISK_SPAWN_OFFSETS = [
-            {x: -1, y: -1}, {x: 1, y: -1}, {x: -1, y: 1}, {x: 1, y: 1},
-        ];
+        // How far in from the board edge a hole is barred from spawning -
+        // the outermost 3 rings would make for a wall with almost no
+        // reach, over before it's a real threat.
+        const BASILISK_EDGE_MARGIN = 3;
+        // Half-width of the center square a hole is also barred from -
+        // 7x7 (this many tiles either side of center, inclusive) is close
+        // enough to see coming and to reach on foot, but far enough out
+        // that the wall it grows still has real reach either way.
+        const BASILISK_CENTER_HALF = 3;
+
+        // Picks this run's 4 hole positions - the only tiles a Basilisk
+        // wall can ever originate from (see spawnBasilisk() below) -
+        // uniformly at random from the board, excluding both the outer
+        // BASILISK_EDGE_MARGIN rings and the center
+        // (2*BASILISK_CENTER_HALF+1)-wide square, and never repeating a
+        // tile. Called once, the moment the encounter starts (see the
+        // specialEventWaiting-resume branch in update()) - the same 4
+        // holes are marked with a dark "hole" from then on (see
+        // drawCornerHoles()), long before any wall actually appears at
+        // any of them, and every one of the 4 does eventually get a wall
+        // - see spawnBasilisk().
+        function randomBasiliskHoles() {
+            const centerX = Math.floor(tileCount / 2);
+            const centerY = Math.floor(tileCount / 2);
+            const low = BASILISK_EDGE_MARGIN;
+            const high = tileCount - 1 - BASILISK_EDGE_MARGIN;
+            const holes = [];
+            while (holes.length < 4) {
+                const x = low + Math.floor(Math.random() * (high - low + 1));
+                const y = low + Math.floor(Math.random() * (high - low + 1));
+                const inCenterSquare = Math.abs(x - centerX) <= BASILISK_CENTER_HALF
+                    && Math.abs(y - centerY) <= BASILISK_CENTER_HALF;
+                if (inCenterSquare) continue;
+                if (holes.some((h) => h.x === x && h.y === y)) continue;
+                holes.push({ x, y });
+            }
+            return holes;
+        }
 
         // Splits BASILISK_TOTAL_FOOD apples across BASILISK_STAGE_COUNT
         // stages, each getting at least BASILISK_STAGE_MIN, the rest
@@ -1938,54 +1983,60 @@
 
         // Basilisk easter egg: can only appear after Ouroboros has already
         // fired (see the specialEventWaiting-resume branch in update(),
-        // which calls this the first time) - spawns the moment play
+        // which also rolls this run's 4 holes via randomBasiliskHoles()
+        // right before the first call here) - spawns the moment play
         // resumes after Ouroboros's own pause, gazing a wall of blocked
-        // tiles out to the board edge. Touching any tile of it, including
-        // the origin, is a death like any wall (see the basiliskActive
-        // check in update()). Also the function a cleared stage calls
-        // again for the next one (see the stage-advance check in
-        // update()), passing `previousOrigin` (the wall it's replacing) -
-        // that's what tells this call it's a respawn rather than the
-        // first spawn.
+        // tiles out to the board edge. Touching any tile of any wall,
+        // including an origin, is a death like any wall (see the
+        // basiliskActive check in update()). Also the function a cleared
+        // stage calls again for the next one (see the stage-advance check
+        // in update()) - each call ADDS one more wall on top of whichever
+        // are already up (see basiliskWalls) rather than replacing them,
+        // so by the last stage all 4 are live hazards at once.
         //
-        // The origin is whichever of the 4 corner tiles surrounding board
-        // center is currently FARTHEST from the snake's head (Manhattan
-        // distance) - not tied to the player's heading at all, so a
-        // respawn genuinely reconsiders from scratch based on where the
-        // snake actually is by then, not just where it was heading a
-        // moment ago. Every candidate has two equally valid axes to grow
-        // along (its row's direction or its column's), so which one it
-        // takes is a coin flip. Either way the wall only ever grows AWAY
-        // from center, one step at a time - it structurally can never
-        // fold back through the center tile itself, which is where a
-        // forgiven death always respawns (see respawnWithSameLength()) -
-        // no separate check needed for that the way a heading-tied design
-        // would require. It also means the wall can never touch a tile
-        // orthogonally adjacent to center, so a forgiven death's respawn
-        // there always has all 4 directions safe (see the corner-hole
-        // visual on all 4 candidates - see drawCornerHoles() - which is
-        // exactly why marking them as a threat the instant Ouroboros
-        // fires is honest: any of the 4 genuinely could be next).
+        // The origin is whichever of this run's 4 holes - excluding
+        // whichever ones already have a wall - is currently FARTHEST from
+        // the snake's head (Manhattan distance), not tied to the player's
+        // heading at all, so each new wall genuinely reconsiders from
+        // scratch based on where the snake actually is by then. Every
+        // candidate has two valid axes to grow along (whichever of its
+        // row or column points away from center), so which one it takes
+        // is a coin flip - unless the hole sits exactly on the center row
+        // or column, where only one axis actually points away from
+        // center at all. Either way the wall only ever grows AWAY from
+        // center, one step at a time - it structurally can never fold
+        // back through the exact center tile, which is where a forgiven
+        // death always respawns (see respawnWithSameLength()) - no
+        // separate check needed for that the way a heading-tied design
+        // would require.
         //
-        // Because "farthest from head" is deterministic (only a corner's
-        // direction is randomised), a respawn could otherwise legitimately
-        // recompute to the exact same tile as before if the snake hasn't
-        // moved much relative to center between stages - so a respawn is
-        // additionally guaranteed not to reappear at the tile it just
-        // vacated (see notRepeat below).
-        function spawnBasilisk(previousOrigin) {
+        // Since every hole is used at most once ever (each stage's
+        // candidates exclude whichever are already spawned), there's no
+        // "don't repeat the last one" rule to speak of the way a
+        // replace-in-place design would need - uniqueness falls out of
+        // the pool shrinking by one every stage.
+        function spawnBasilisk() {
             const centerX = Math.floor(tileCount / 2);
             const centerY = Math.floor(tileCount / 2);
             const headPos = snake[0];
 
-            // Every candidate is a corner tile, with two valid axes to
-            // grow along (its row's direction or its column's); picked
-            // once per candidate here, not re-rolled every time it's
-            // checked below.
-            const directionFor = (o) => Math.random() < 0.5 ? { x: o.x, y: 0 } : { x: 0, y: o.y };
-            const wallFor = (o, dir) => {
-                const wall = [{x: centerX + o.x, y: centerY + o.y}];
-                let x = wall[0].x, y = wall[0].y;
+            const usedOrigin = (h) => basiliskWalls.some((wall) => wall[0].x === h.x && wall[0].y === h.y);
+            const unused = basiliskHoles.filter((h) => !usedOrigin(h));
+
+            // Whichever axis actually points away from center for this
+            // hole - a coin flip when both do (the common case), forced
+            // to the one that does when the hole sits exactly on the
+            // center row or column (dx or dy is 0, and 0 points nowhere).
+            const directionFor = (h) => {
+                const dx = Math.sign(h.x - centerX);
+                const dy = Math.sign(h.y - centerY);
+                if (dx === 0) return { x: 0, y: dy };
+                if (dy === 0) return { x: dx, y: 0 };
+                return Math.random() < 0.5 ? { x: dx, y: 0 } : { x: 0, y: dy };
+            };
+            const wallFor = (h, dir) => {
+                const wall = [{x: h.x, y: h.y}];
+                let x = h.x, y = h.y;
                 while (x + dir.x >= 0 && x + dir.x < tileCount && y + dir.y >= 0 && y + dir.y < tileCount) {
                     x += dir.x;
                     y += dir.y;
@@ -1998,28 +2049,29 @@
             // stable, so without this, a tie (the head sitting exactly on
             // the center row or column, where two candidates on opposite
             // sides are equidistant) would always resolve the same way,
-            // toward whichever offset happens to come first in
-            // BASILISK_SPAWN_OFFSETS - a hidden, silent bias rather than a
-            // genuine coin flip. Shuffling a copy first means a tie's
-            // relative order (and so which one `.sort()` keeps in front)
-            // is random instead.
-            const shuffled = [...BASILISK_SPAWN_OFFSETS];
+            // toward whichever hole happens to come first in
+            // basiliskHoles - a hidden, silent bias rather than a genuine
+            // coin flip. Shuffling a copy first means a tie's relative
+            // order (and so which one `.sort()` keeps in front) is random
+            // instead.
+            const shuffled = [...unused];
             for (let i = shuffled.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
             }
 
-            // Every candidate, its (possibly random) direction, its full
-            // wall line, and its distance from the current head - built
-            // once so the direction stays fixed per candidate throughout
-            // the filtering below, and sorted farthest-first so "pick the
-            // one furthest from head" just means "take the first survivor".
-            const all = shuffled.map((o) => {
-                const dir = directionFor(o);
+            // Every remaining candidate, its (possibly random) direction,
+            // its full wall line, and its distance from the current head -
+            // built once so the direction stays fixed per candidate
+            // throughout the filtering below, and sorted farthest-first
+            // so "pick the one furthest from head" just means "take the
+            // first survivor".
+            const all = shuffled.map((h) => {
+                const dir = directionFor(h);
                 return {
-                    origin: { x: centerX + o.x, y: centerY + o.y },
-                    wall: wallFor(o, dir),
-                    dist: Math.abs(centerX + o.x - headPos.x) + Math.abs(centerY + o.y - headPos.y),
+                    origin: h,
+                    wall: wallFor(h, dir),
+                    dist: Math.abs(h.x - headPos.x) + Math.abs(h.y - headPos.y),
                 };
             }).sort((a, b) => b.dist - a.dist);
 
@@ -2031,50 +2083,35 @@
             const isBodySafe = (c) => !c.wall.some((seg) => snake.some((s) => s.x === seg.x && s.y === seg.y));
             const bodySafe = all.filter(isBodySafe);
 
-            // A respawn must not reappear at the tile it just vacated -
-            // "somewhere new" is the whole point, not just statistically
-            // likely, and "farthest from head" alone wouldn't guarantee
-            // that on its own, being deterministic (only a corner's
-            // direction is randomised) - see the big comment above. No-op
-            // on the first spawn, where there's no previous origin to
-            // avoid.
-            const notRepeat = previousOrigin
-                ? bodySafe.filter((c) => c.origin.x !== previousOrigin.x || c.origin.y !== previousOrigin.y)
-                : bodySafe;
-
             // For a later stage, the snake is no longer necessarily short
             // and freshly collapsed at center the way it is on the very
             // first spawn - by now it may have grown enough to actually
-            // pass near center, where every candidate originates. Falls
-            // back a step at a time - first to allowing a repeat (still
-            // snake-safe), then to every candidate regardless - since
-            // even this could in principle all collide; avoiding the
-            // snake takes priority over the no-repeat guarantee, but this
+            // pass near one of this run's holes. Falls back to every
+            // remaining candidate regardless of body safety only if that
+            // leaves nothing - avoiding the snake takes priority, but this
             // spawn always has to place a wall somewhere right now.
-            const candidates = notRepeat.length > 0 ? notRepeat
-                : bodySafe.length > 0 ? bodySafe
-                : all;
+            const candidates = bodySafe.length > 0 ? bodySafe : all;
 
-            // `all` (and so every filtered subset of it) is already
-            // sorted farthest-from-head first, so the surviving candidate
-            // at the front is exactly the one to use.
-            basiliskWall = candidates[0].wall;
+            // `all` (and so bodySafe) is already sorted farthest-from-head
+            // first, so the surviving candidate at the front is exactly
+            // the one to use.
+            basiliskWalls.push(candidates[0].wall);
             basiliskActive = true;
             basiliskFoodCounter = 0;
 
-            // The wall may now be sitting under the current food/bad food -
-            // re-roll both so neither spawns on (or stays on) it.
+            // The new wall may now be sitting under the current food/bad
+            // food - re-roll both so neither spawns on (or stays on) it.
             randomFood();
             randomBadFood();
         }
 
-        // The wall persisting isn't itself the achievement - surviving
+        // The walls persisting isn't itself the achievement - surviving
         // every stage's quota of apples (not raw moves - circling in
         // place forever would otherwise clear it for free) is. Checked
         // in update() above.
         function triggerBasiliskSurvived() {
             basiliskActive = false;
-            basiliskWall = [];
+            basiliskWalls = [];
             basiliskTriggered = true;
             basiliskStage = 0;
             basiliskStageQuotas = [];
@@ -2211,7 +2248,8 @@
             regrowPending = 0;
             basiliskTriggered = false;
             basiliskActive = false;
-            basiliskWall = [];
+            basiliskWalls = [];
+            basiliskHoles = [];
             basiliskFoodCounter = 0;
             basiliskStage = 0;
             basiliskStageQuotas = [];

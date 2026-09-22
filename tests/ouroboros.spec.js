@@ -84,7 +84,7 @@ test('it fires only once per run', async ({ game }) => {
         // hide the very thing this test is checking.
         ouroborosLifeAvailable = false;
         basiliskActive = false;
-        basiliskWall = [];
+        basiliskWalls = [];
         h.setSnake(h.coil());
         dx = 0;
         dy = -1;
