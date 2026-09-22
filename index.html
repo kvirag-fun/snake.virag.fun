@@ -1542,6 +1542,34 @@
                 ctx.fillRect(snake[i].x * gridSize, snake[i].y * gridSize, gridSize - 2, gridSize - 2);
             }
 
+            // Tail-tip marker: once the snake reaches OUROBOROS_FULL_BONUS_LENGTH,
+            // biting the tail now would earn the full 400-point bonus (see
+            // triggerOuroboros()'s bonusProgress clamp) rather than a scaled-down
+            // one - a gold frame on the tail block itself is the cue, so there's
+            // no need to check the score/length HUD to know you're at max value.
+            // A radial gradient, transparent through most of the tile and only
+            // solid gold right at the edge, rather than a flat gold fill - a
+            // full gold tail would be visually indistinguishable from the
+            // snake's own post-trigger reward color (see SNAKE_COLORS.ouroboros
+            // above), which would misleadingly suggest Ouroboros had already
+            // fired. Stops entirely the moment it has (ouroborosTriggered),
+            // since the cue no longer means anything once it can't be earned
+            // again this run.
+            if (!ouroborosTriggered && snake.length >= OUROBOROS_FULL_BONUS_LENGTH) {
+                const tailSize = gridSize - 2;
+                const tail = snake[snake.length - 1];
+                const tailPx = tail.x * gridSize;
+                const tailPy = tail.y * gridSize;
+                const cx = tailPx + tailSize / 2;
+                const cy = tailPy + tailSize / 2;
+                const tailGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, tailSize / 2);
+                tailGlow.addColorStop(0, 'rgba(255, 215, 0, 0)');
+                tailGlow.addColorStop(0.7, 'rgba(255, 215, 0, 0)');
+                tailGlow.addColorStop(1, 'rgba(255, 215, 0, 0.95)');
+                ctx.fillStyle = tailGlow;
+                ctx.fillRect(tailPx, tailPy, tailSize, tailSize);
+            }
+
             // Draw snake - darker head
             const headX = snake[0].x * gridSize
             const headY = snake[0].y * gridSize

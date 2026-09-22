@@ -134,3 +134,79 @@ test('a forgiven death respawns at the board centre at length 1', async ({ game 
     });
     expect(state.regrowPending).toBeGreaterThan(0);
 });
+
+// A boustrophedon path (row 0 left-to-right, row 1 right-to-left, ...)
+// rather than h.stack()'s everything-on-one-tile shape - the glow test
+// below samples the tail tile's own pixels, which only means something
+// if the tail is actually drawn somewhere the head and body don't also
+// overwrite it.
+function boustrophedon(length) {
+    const path = [];
+    for (let row = 0; path.length < length; row++) {
+        const xs = row % 2 === 0
+            ? Array.from({ length: 21 }, (_, x) => x)
+            : Array.from({ length: 21 }, (_, x) => 20 - x);
+        for (const x of xs) {
+            if (path.length >= length) break;
+            path.push({ x, y: row });
+        }
+    }
+    return path;
+}
+
+// Samples the tail tile's own center (should read as plain body green
+// throughout - the gradient is transparent there by design, see
+// index.html) and a pixel right at its edge (gold once eligible).
+function tailPixels(game) {
+    return game.evaluate(() => {
+        const tail = snake[snake.length - 1];
+        const size = gridSize - 2;
+        const px = tail.x * gridSize, py = tail.y * gridSize;
+        const center = ctx.getImageData(px + Math.floor(size / 2), py + Math.floor(size / 2), 1, 1).data;
+        const edge = ctx.getImageData(px + 1, py + 1, 1, 1).data;
+        return { center: [center[0], center[1], center[2]], edge: [edge[0], edge[1], edge[2]] };
+    });
+}
+
+const BODY_GREEN = [173, 221, 187];  // SNAKE_COLORS.normal.body, #ADDDBB
+function isGoldish([r, g, b]) {
+    return r > 200 && g > 150 && b < 100;
+}
+
+test('the tail gets a gold frame once it reaches max-bonus length, not before', async ({ game }) => {
+    await game.evaluate((cells) => {
+        window.__game.reset();
+        window.__game.setSnake(cells);
+        dx = 1; dy = 0;
+        needsRedraw = true;
+        drawGame();
+    }, boustrophedon(39));
+    let pixels = await tailPixels(game);
+    expect(pixels.center).toEqual(BODY_GREEN);
+    expect(isGoldish(pixels.edge)).toBe(false);
+
+    await game.evaluate((cells) => {
+        window.__game.setSnake(cells);
+        needsRedraw = true;
+        drawGame();
+    }, boustrophedon(40));
+    pixels = await tailPixels(game);
+    // Center stays readable as body color - a solid gold tail would be
+    // indistinguishable from the snake's actual post-trigger reward
+    // color (SNAKE_COLORS.ouroboros), which would misleadingly suggest
+    // Ouroboros had already fired.
+    expect(pixels.center).toEqual(BODY_GREEN);
+    expect(isGoldish(pixels.edge)).toBe(true);
+});
+
+test('the tail glow turns off once Ouroboros has actually fired', async ({ game }) => {
+    await game.evaluate((cells) => {
+        window.__game.reset();
+        window.__game.setSnake(cells);
+        ouroborosTriggered = true;
+        needsRedraw = true;
+        drawGame();
+    }, boustrophedon(40));
+    const pixels = await tailPixels(game);
+    expect(isGoldish(pixels.edge)).toBe(false);
+});

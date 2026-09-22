@@ -69,7 +69,14 @@ can earn all three.
   deliberately discourages triggering it the instant it's geometrically
   possible just to breeze through the easiest, slowest part of a run;
   the reward only matches the myth once you've actually risked
-  something. It also banks a **free life**: whatever kills the run next (wall,
+  something. Once you cross `OUROBOROS_FULL_BONUS_LENGTH`, the tail tile
+  itself gets a gold frame - a radial gradient, transparent through the
+  middle and solid gold only at the very edge, not a flat gold fill (that
+  would be indistinguishable from the snake's actual post-trigger gold,
+  see below, and misleadingly suggest it had already fired) - so there's
+  a visual cue for "biting now earns the full bonus" without checking the
+  score. Turns off the moment Ouroboros actually fires, since the cue
+  can't mean anything once it's already been earned this run. It also banks a **free life**: whatever kills the run next (wall,
   self-collision, rotten apple - any cause) is forgiven instead of
   ending it, respawning the snake as a single tile at the board's
   center - the same point a fresh game starts from - with the exact
@@ -278,7 +285,7 @@ silent no-op until it's dismissed.
 | Spec | Covers |
 | --- | --- |
 | `deaths.spec.js` | The four death causes and their message/image tables |
-| `ouroboros.spec.js` | The scaled bonus curve, the collapse, the free life, once-per-run |
+| `ouroboros.spec.js` | The scaled bonus curve, the collapse, the free life, once-per-run, and the tail's gold frame at max-bonus length (on/off, and off again once actually triggered) |
 | `basilisk.spec.js` | Spawn geometry (sampled over repeated runs), the gaze death, the apple counter, the 4-stage split and its randomisation, outgazing |
 | `chain.spec.js` | Egg gating, both free lives, full-run score arithmetic, restart, leaderboard badges |
 | `regrow.spec.js` | The no-apple-while-regrowing rule, on all four collapse paths |
