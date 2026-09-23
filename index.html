@@ -272,8 +272,14 @@
             background: var(--card);
             color: var(--foreground);
             font-family: var(--font-sans);
-            /* 16px minimum - see #difficultySelect's comment on the same
-               iOS Safari auto-zoom-on-focus quirk. */
+            /* 16px is the minimum that keeps iOS Safari (and some Android
+               browsers) from auto-zooming the viewport on focus - that
+               auto-zoom isn't blocked by user-scalable=no (only manual
+               pinch/double-tap zoom is), and it doesn't get undone by a
+               reload since it's a browser viewport-zoom state, not page
+               state - so once triggered, it's stuck zoomed in with no way
+               back out. Only text-entry controls trigger it, so the
+               difficulty toggle (a checkbox) doesn't need this. */
             font-size: 16px;
         }
 
@@ -498,7 +504,7 @@
             color: var(--muted-foreground);
         }
 
-        .difficulty-selector label {
+        .difficulty-selector-heading {
             display: block;
             color: var(--primary);
             padding-bottom: 6px;
@@ -506,33 +512,79 @@
             border-bottom: 1px solid var(--border);
         }
 
-        #difficultySelect:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        .difficulty-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            cursor: pointer;
+            user-select: none;
         }
 
-        #difficultySelect {
-            width: 100%;
-            box-sizing: border-box;
-            background: var(--card);
+        .difficulty-toggle.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+
+        .difficulty-toggle-option {
+            font-size: 12px;
+            color: var(--muted-foreground);
+            transition: color 0.15s ease;
+        }
+
+        .difficulty-toggle-option.active {
             color: var(--foreground);
-            border: 1px solid var(--border);
-            border-radius: 3px;
-            padding: 5px 3px;
-            /* 16px is the minimum that keeps iOS Safari (and some Android
-               browsers) from auto-zooming the viewport on focus - that
-               auto-zoom isn't blocked by user-scalable=no (only manual
-               pinch/double-tap zoom is), and it doesn't get undone by a
-               reload since it's a browser viewport-zoom state, not page
-               state - so once triggered, it's stuck zoomed in with no way
-               back out. */
-            font-size: 16px;
-            font-family: var(--font-sans);
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 42px;
+            height: 22px;
+            flex-shrink: 0;
+        }
+
+        .toggle-switch input {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            margin: 0;
             cursor: pointer;
         }
 
-        #difficultySelect:hover {
+        .toggle-switch input:disabled {
+            cursor: not-allowed;
+        }
+
+        .toggle-track {
+            position: absolute;
+            inset: 0;
+            box-sizing: border-box;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 11px;
+            pointer-events: none;
+        }
+
+        .toggle-switch input:hover:not(:disabled) ~ .toggle-track {
             border-color: var(--primary);
+        }
+
+        .toggle-thumb {
+            position: absolute;
+            top: 1px;
+            left: 1px;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: var(--muted-foreground);
+            transition: transform 0.15s ease, background 0.15s ease;
+        }
+
+        .toggle-switch input:checked ~ .toggle-track .toggle-thumb {
+            transform: translateX(20px);
+            background: var(--primary);
         }
 
         @media (max-width: 480px) {
@@ -606,11 +658,15 @@
                     <input type="checkbox" id="soundToggle"> Sound on
                 </label>
                 <div class="difficulty-selector" id="difficultySelector">
-                    <label>Difficulty</label>
-                    <select id="difficultySelect">
-                        <option value=0.00 selected>🐍 Viper</option>
-                        <option value=0.50>💀 Anaconda</option>
-                    </select>
+                    <div class="difficulty-selector-heading">Difficulty</div>
+                    <label class="difficulty-toggle">
+                        <span class="difficulty-toggle-option" data-difficulty="0.00">🐍 Viper</span>
+                        <span class="toggle-switch">
+                            <input type="checkbox" id="difficultyToggle" role="switch" aria-label="Difficulty: off is Viper, on is Anaconda">
+                            <span class="toggle-track"><span class="toggle-thumb"></span></span>
+                        </span>
+                        <span class="difficulty-toggle-option" data-difficulty="0.50">💀 Anaconda</span>
+                    </label>
                 </div>
             </div>
         </div>
@@ -786,7 +842,7 @@
         const extraLifeIndicatorElement = document.getElementById('extraLifeIndicator');
         const basiliskLifeIndicatorElement = document.getElementById('basiliskLifeIndicator');
         const soundToggle = document.getElementById('soundToggle');
-        const difficultySelect = document.getElementById('difficultySelect');
+        const difficultyToggle = document.getElementById('difficultyToggle');
 
         // The theme just loops continuously in the background for as long
         // as the checkbox is on - checking it is itself the user gesture
@@ -804,7 +860,7 @@
             }
         });
 
-        difficultySelect.addEventListener('change', function() {
+        difficultyToggle.addEventListener('change', function() {
             if (!gameRunning) {
                 this.blur();
                 updateDifficultyDisplay();
@@ -1119,25 +1175,37 @@
         };
         let deathCause = null;
 
+        // The checkbox itself only ever means "off = Viper, on = Anaconda" -
+        // every other piece of code that needs the difficulty as a value
+        // ('0.00'/'0.50', the same strings firestore.rules whitelists and
+        // submitGlobalScore()/fetchGlobalTop5() key the leaderboard by)
+        // goes through this rather than reading .checked directly.
+        function currentDifficultyValue() {
+            const difficultyToggle = document.getElementById('difficultyToggle');
+            return difficultyToggle.checked ? '0.50' : '0.00';
+        }
+
         function updateDifficultyDisplay() {
-            const difficultySelect = document.getElementById('difficultySelect');
             const currentDifficulty = document.getElementById('currentDifficulty');
             const options = {
                 '0.00': 'Viper 🐍',
                 '0.50': 'Anaconda 💀',
             };
-            currentDifficulty.textContent = options[difficultySelect.value] || 'Viper 🐍';
+            const value = currentDifficultyValue();
+            currentDifficulty.textContent = options[value] || 'Viper 🐍';
+            document.querySelectorAll('.difficulty-toggle-option').forEach((el) => {
+                el.classList.toggle('active', el.dataset.difficulty === value);
+            });
         }
 
         function toggleDifficultySelector() {
+            const difficultyToggleLabel = difficultyToggle.closest('.difficulty-toggle');
             if (gameRunning) {
-                difficultySelect.disabled = true;
-                difficultySelect.style.opacity = '0.5';
-                difficultySelect.style.cursor = 'not-allowed';
+                difficultyToggle.disabled = true;
+                difficultyToggleLabel.classList.add('disabled');
             } else {
-                difficultySelect.disabled = false;
-                difficultySelect.style.opacity = '1';
-                difficultySelect.style.cursor = 'pointer';
+                difficultyToggle.disabled = false;
+                difficultyToggleLabel.classList.remove('disabled');
             }
         }
 
@@ -1172,7 +1240,7 @@
 
         async function submitScoreWithNickname(finalScore, nickname) {
             try {
-                await submitGlobalScore(difficultySelect.value, finalScore, nickname, ouroborosTriggered, jormungandrTriggered, basiliskTriggered);
+                await submitGlobalScore(currentDifficultyValue(), finalScore, nickname, ouroborosTriggered, jormungandrTriggered, basiliskTriggered);
             } catch (e) {
                 console.warn('Could not submit score to the global leaderboard:', e);
             }
@@ -1208,10 +1276,10 @@
             // cachedTop5. That silently corrupts qualifiesForTop5()'s
             // comparison (checked against the wrong difficulty's scores)
             // and the board shown on screen.
-            const requestedDifficulty = difficultySelect.value;
+            const requestedDifficulty = currentDifficultyValue();
             try {
                 const globalScores = await fetchGlobalTop5(requestedDifficulty);
-                if (difficultySelect.value !== requestedDifficulty) return;
+                if (currentDifficultyValue() !== requestedDifficulty) return;
                 cachedTop5 = globalScores;
                 renderScores(globalScores);
             } catch (e) {
@@ -2203,8 +2271,7 @@
 
         //Get game difficulty
         function getGameDifficulty() {
-            const difficultySelect = document.getElementById('difficultySelect');
-            return parseFloat(difficultySelect.value);
+            return parseFloat(currentDifficultyValue());
         }
         
         // Game over
@@ -2347,10 +2414,11 @@
         // the bezel/edge on a tablet, past the canvas's own bounds) still
         // steers the snake, the same way arrow keys work regardless of
         // where focus is. The one exception is the settings panel's actual
-        // form controls (the difficulty <select>, the sound <input>, and
-        // their <label>s) - those need their own native touch handling
-        // (opening the dropdown, toggling the checkbox) to keep working,
-        // so a touch that starts on one of them is left alone entirely.
+        // form controls (the difficulty toggle and the sound checkbox,
+        // both <input type="checkbox">, and their <label>s) - those need
+        // their own native touch handling (toggling the checkbox) to keep
+        // working, so a touch that starts on one of them is left alone
+        // entirely.
         let touchStartX = 0;
         let touchStartY = 0;
         let touchIsOnControl = false;
@@ -2368,7 +2436,7 @@
         const minSwipeDistance = 26;
 
         function isFormControl(target) {
-            return target.closest('select, input, label, #infoOverlay, #infoButton, #nicknameOverlay') !== null;
+            return target.closest('input, label, #infoOverlay, #infoButton, #nicknameOverlay') !== null;
         }
 
         document.addEventListener('touchstart', (e) => {
