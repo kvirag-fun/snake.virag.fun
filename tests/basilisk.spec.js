@@ -53,7 +53,7 @@ test('it spawns on the swipe that resumes play after Ouroboros', async ({ game }
     expect(state.basiliskFoodCounter).toBe(0);
 });
 
-test('randomBasiliskHoles() picks 4 distinct tiles outside the outer margin and the center square', async ({ game }) => {
+test('randomBasiliskHoles() picks 4 distinct tiles outside the outer margin and the center square, spread at least 5 apart', async ({ game }) => {
     const samples = await game.evaluate((trials) => {
         const out = [];
         for (let i = 0; i < trials; i++) out.push(randomBasiliskHoles());
@@ -72,6 +72,12 @@ test('randomBasiliskHoles() picks 4 distinct tiles outside the outer margin and 
             expect(h.y).toBeLessThanOrEqual(17);
             const inCenterSquare = Math.abs(h.x - centerX) <= 3 && Math.abs(h.y - centerY) <= 3;
             expect(inCenterSquare).toBe(false);
+        }
+        for (let i = 0; i < holes.length; i++) {
+            for (let j = i + 1; j < holes.length; j++) {
+                const dist = Math.abs(holes[i].x - holes[j].x) + Math.abs(holes[i].y - holes[j].y);
+                expect(dist).toBeGreaterThanOrEqual(5);
+            }
         }
     }
 });

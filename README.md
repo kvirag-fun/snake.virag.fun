@@ -108,8 +108,11 @@ can earn all three.
   the whole board, excluding both the outer 3 rings (a wall there would
   have almost no reach - over before it's a real threat) and the center
   7x7 square (`BASILISK_EDGE_MARGIN`/`BASILISK_CENTER_HALF`/
-  `randomBasiliskHoles()`) - every other tile is fair game, not just the
-  4 corners next to center the way earlier versions of this worked. Each
+  `randomBasiliskHoles()`), and kept at least 5 tiles apart (Manhattan)
+  from every other hole already picked (`BASILISK_MIN_HOLE_DISTANCE`) so
+  the 4 don't clump into one corner - every other tile is fair game, not
+  just the 4 corners next to center the way earlier versions of this
+  worked. Each
   of the 4 holes is used exactly once, ever, across the whole encounter:
   whichever of the *not-yet-used* holes sits farthest, by Manhattan
   distance, from the snake's head at that moment is picked for the next

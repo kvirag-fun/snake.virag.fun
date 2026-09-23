@@ -1923,13 +1923,21 @@
         // enough to see coming and to reach on foot, but far enough out
         // that the wall it grows still has real reach either way.
         const BASILISK_CENTER_HALF = 3;
+        // Minimum Manhattan distance between any two of this run's 4
+        // holes - without it, the RNG occasionally clumps several holes
+        // into the same corner of the board, leaving the rest of it
+        // untouched even across all 4 stages. Forcing spread means every
+        // stage's wall has a real chance of showing up somewhere new.
+        const BASILISK_MIN_HOLE_DISTANCE = 5;
 
         // Picks this run's 4 hole positions - the only tiles a Basilisk
         // wall can ever originate from (see spawnBasilisk() below) -
         // uniformly at random from the board, excluding both the outer
         // BASILISK_EDGE_MARGIN rings and the center
-        // (2*BASILISK_CENTER_HALF+1)-wide square, and never repeating a
-        // tile. Called once, the moment the encounter starts (see the
+        // (2*BASILISK_CENTER_HALF+1)-wide square, each at least
+        // BASILISK_MIN_HOLE_DISTANCE apart (Manhattan) from every hole
+        // already picked, which also rules out repeating a tile outright.
+        // Called once, the moment the encounter starts (see the
         // specialEventWaiting-resume branch in update()) - the same 4
         // holes are marked with a dark "hole" from then on (see
         // drawCornerHoles()), long before any wall actually appears at
@@ -1947,7 +1955,9 @@
                 const inCenterSquare = Math.abs(x - centerX) <= BASILISK_CENTER_HALF
                     && Math.abs(y - centerY) <= BASILISK_CENTER_HALF;
                 if (inCenterSquare) continue;
-                if (holes.some((h) => h.x === x && h.y === y)) continue;
+                const tooClose = holes.some((h) =>
+                    Math.abs(h.x - x) + Math.abs(h.y - y) < BASILISK_MIN_HOLE_DISTANCE);
+                if (tooClose) continue;
                 holes.push({ x, y });
             }
             return holes;
