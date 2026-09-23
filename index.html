@@ -609,9 +609,7 @@
                     <label>Difficulty</label>
                     <select id="difficultySelect">
                         <option value=0.00 selected>🐍 Viper</option>
-                        <option value=0.25>⚡ Python</option>
                         <option value=0.50>💀 Anaconda</option>
-                        <option value=1.00>🔥 King Cobra</option>
                     </select>
                 </div>
             </div>
@@ -657,7 +655,7 @@
             <ul class="info-list">
                 <li>Eat the apples to grow and score points.</li>
                 <li>Running into a wall or a rotten apple ends the run.</li>
-                <li>Four difficulty levels change how fast the snake moves - Viper is slowest, King Cobra fastest.</li>
+                <li>Two difficulty levels change how often a rotten apple appears - Viper never spawns one, Anaconda spawns one on half the apples you eat. Speed is the same either way, driven purely by score.</li>
                 <li>Each difficulty has its own global top-5 leaderboard, shared by everyone who plays.</li>
                 <li>Make the top 5 and you can add an optional nickname.</li>
                 <li>Whenever the snake is regrowing, no apple appears until it's back to full length.</li>
@@ -1126,9 +1124,7 @@
             const currentDifficulty = document.getElementById('currentDifficulty');
             const options = {
                 '0.00': 'Viper 🐍',
-                '0.25': 'Python ⚡', 
                 '0.50': 'Anaconda 💀',
-                '1.00': 'King Cobra 🔥'
             };
             currentDifficulty.textContent = options[difficultySelect.value] || 'Viper 🐍';
         }

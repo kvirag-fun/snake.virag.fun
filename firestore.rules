@@ -10,7 +10,7 @@ service cloud.firestore {
 
       allow create:
         if request.resource.data.keys().hasOnly(['difficulty', 'score', 'nickname', 'ouroboros', 'jormungandr', 'basilisk', 'createdAt'])
-        && request.resource.data.difficulty in ['0.00', '0.25', '0.50', '1.00']
+        && request.resource.data.difficulty in ['0.00', '0.50']
         && request.resource.data.score is int
         && request.resource.data.score >= 0
         // 21x21 board, +10 per food: the snake can reach at most 441

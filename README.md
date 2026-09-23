@@ -13,9 +13,9 @@ installable as a PWA. Live at
   (not after you lift it). The numpad cluster is for keyboards where the
   arrow keys split Up/Down away from Left/Right; 5 is Down rather than 2
   so all four directions sit in one reachable diamond around 8/4/6.
-- **Four difficulty levels** (Viper, Python, Anaconda, King Cobra), each
-  with its own **global top-5 leaderboard** shared across everyone who
-  plays, backed by Firestore. Making the top 5 prompts for an optional
+- **Two difficulty levels** (Viper, Anaconda), each with its own
+  **global top-5 leaderboard** shared across everyone who plays, backed
+  by Firestore. Making the top 5 prompts for an optional
   nickname (client-side profanity/charset filtered), with the option to
   not save the score at all instead.
 - **Bad food**: occasional hazard tiles mixed in with regular food —
@@ -328,7 +328,7 @@ self-contained — they need a real Firestore project to write to. Unlike
 the other virag.fun apps, there's no login here (it's a public game), so
 `firestore.rules` is the *entire* anti-cheat model: reads are public,
 writes are validated entirely server-side (`difficulty` must be one of
-the 4 real values, `score` must be a non-negative integer no higher than
+the 2 real values, `score` must be a non-negative integer no higher than
 the board can actually produce, `nickname` (optional) must be a string
 of 15 characters or fewer restricted to a safe charset — which also
 rules out emoji, so a player can't fake the Ouroboros badge by typing
