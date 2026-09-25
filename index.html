@@ -528,13 +528,17 @@
         }
 
         .difficulty-toggle-option {
-            font-size: 12px;
-            color: var(--muted-foreground);
-            transition: color 0.15s ease;
+            font-size: 15px;
+            /* Emoji glyphs render in full color regardless of the CSS
+               `color` property, so opacity is what actually shows which
+               side is active - a text `color` swap (the pre-emoji-only
+               version of this rule) would be a silent no-op here. */
+            opacity: 0.4;
+            transition: opacity 0.15s ease;
         }
 
         .difficulty-toggle-option.active {
-            color: var(--foreground);
+            opacity: 1;
         }
 
         .toggle-switch {
@@ -660,12 +664,12 @@
                 <div class="difficulty-selector" id="difficultySelector">
                     <div class="difficulty-selector-heading">Difficulty</div>
                     <label class="difficulty-toggle">
-                        <span class="difficulty-toggle-option" data-difficulty="0.00">🐍 Viper</span>
+                        <span class="difficulty-toggle-option" data-difficulty="0.00" title="Viper">🐍</span>
                         <span class="toggle-switch">
                             <input type="checkbox" id="difficultyToggle" role="switch" aria-label="Difficulty: off is Viper, on is Anaconda">
                             <span class="toggle-track"><span class="toggle-thumb"></span></span>
                         </span>
-                        <span class="difficulty-toggle-option" data-difficulty="0.50">💀 Anaconda</span>
+                        <span class="difficulty-toggle-option" data-difficulty="0.50" title="Anaconda">💀</span>
                     </label>
                 </div>
             </div>
